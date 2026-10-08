@@ -10,6 +10,14 @@
   const App = {};
   let cur = { name: null, params: null, mod: null };
   const stack = [];
+  let root = view; // fresh container per screen so its listeners are dropped on navigation
+  function mountScreen() {
+    view.textContent = '';
+    root = document.createElement('div'); root.className = 'screen-root';
+    root.innerHTML = cur.mod.render(cur.params);
+    view.appendChild(root);
+    cur.mod.mount && cur.mod.mount(root, cur.params);
+  }
 
   /* ---------- sound ---------- */
   let actx = null, muted = false;
@@ -67,12 +75,11 @@
     opts = opts || {};
     if (!S[name]) name = 'hatchery';
     if (cur.mod && cur.mod.unmount) cur.mod.unmount();
-    if (!opts.back && cur.name && !(cur.name === name && !params)) stack.push({ name: cur.name, params: cur.params });
+    if (!opts.back && cur.name && !(cur.name === 'rules' && cur.params.edit) && !(cur.name === name && !params)) stack.push({ name: cur.name, params: cur.params });
     cur = { name, params: params || {}, mod: S[name] };
     overlay.hidden = true; overlay.innerHTML = '';
-    view.innerHTML = cur.mod.render(cur.params);
+    mountScreen();
     S.applyTheme(cur.mod.themeFor ? cur.mod.themeFor(cur.params) : null);
-    cur.mod.mount && cur.mod.mount(view, cur.params);
     view.scrollTop = 0; drawBar();
     try { history.replaceState(null, '', name === 'boot' ? location.pathname : hashFor(name, cur.params)); } catch (e) { /* file:// */ }
     const first = $('[data-primary]', view) || focusables().find(el => view.contains(el));
@@ -81,7 +88,7 @@
   };
   App.refresh = function (focusSel) {
     const top = view.scrollTop;
-    view.innerHTML = cur.mod.render(cur.params); cur.mod.mount && cur.mod.mount(view, cur.params);
+    mountScreen();
     view.scrollTop = top; drawBar();
     const f = focusSel && $(focusSel, view); if (f) f.focus({ preventScroll: true });
   };
@@ -201,7 +208,7 @@
   });
 
   /* ---------- live world ---------- */
-  API.on('tick', () => { if (cur.mod && cur.mod.tick && overlay.hidden) cur.mod.tick(view); });
+  API.on('tick', () => { if (cur.mod && cur.mod.tick && overlay.hidden) cur.mod.tick(root); });
   API.on('fire', ({ pet }) => { App.led(); if (cur.name === 'pet' && cur.params.id === pet.id) App.sfx('fire'); });
   API.on('spawn', () => drawBar());
 

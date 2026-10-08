@@ -41,6 +41,9 @@
     return d;
   }
   const draft = loadDraft();
+  let editing = null; // { id, name, species, color, rules } when rewriting a live pet's rules
+  const T = () => editing || draft;
+  const persist = () => { if (!editing) saveDraft(); };
   const saveDraft = () => {
     try { localStorage.setItem('rulepets.draft', JSON.stringify(Object.assign({}, draft, { image: null, rules: draft.rules.map(r => ({ metric: r.metric, op: r.op, value: r.value, action: r.action, param: r.param, repeat: r.repeat })) }))); } catch (e) { /* ignore */ }
   };
@@ -53,6 +56,8 @@
         <div>
           <h2 class="hero">Launch a token that follows your rules.</h2>
           <p class="lede">Every coin here is a pet. Slot in rule cartridges like “if market cap reaches $10k, change the image” or “if volume drops below $8k, tweet,” and your pet carries them out on Solana, on its own.</p>
+          <div class="reel" aria-hidden="true"><span class="reel-k">If</span><span class="reel-c" id="reelIf"></span><span class="reel-k">then</span><span class="reel-c reel-t" id="reelThen"></span></div>
+          <p class="reel-cap">You write the rules. The coin follows them, and only them.</p>
           <div class="boot-actions">
             <button class="btn big hot" data-go="hatchery" data-primary>Enter the hatchery</button>
             <button class="btn big alt" id="hatchEgg">Hatch an egg</button>
@@ -63,6 +68,15 @@
       </section>`;
     },
     mount(root) {
+      const REEL = [['market cap reaches $10k', 'change its image'], ['24h volume drops below $8k', 'tweet “woof”'], ['1h change drops below -20%', 'buy back 2 SOL'], ['holders reach 1,000', 'airdrop 5 SOL to everyone'], ['age reaches 24h', 'rename itself']];
+      let ri = 0;
+      const showReel = () => {
+        const a = $('#reelIf', root), b = $('#reelThen', root); if (!a) return;
+        a.textContent = REEL[ri][0]; b.textContent = REEL[ri][1];
+        [a, b].forEach(x => { x.style.animation = 'none'; void x.offsetWidth; x.style.animation = ''; });
+        ri = (ri + 1) % REEL.length;
+      };
+      showReel(); this.reel = setInterval(showReel, 2800);
       const stage = $('.egg-stage', root);
       let busy = false;
       const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -89,7 +103,8 @@
         if ($('.egg-pop', btn)) { btn.innerHTML = S.sprite('egg', { scale: 14 }); setTimeout(hatch, 120); } else hatch();
       });
       $('#hatchEgg', root).addEventListener('click', () => $('#egg', root).click());
-    }
+    },
+    unmount() { clearInterval(this.reel); }
   };
 
   /* ================= HATCHERY ================= */
@@ -105,9 +120,11 @@
   }
   function nextHtml(p) {
     const n = nextRule(p);
-    if (!n) return { text: 'Every rule has fired.', pct: 100 };
+    const cnt = `${p.rules.length} rule${p.rules.length === 1 ? '' : 's'}`;
+    if (!n) return { text: `${cnt} · every one has fired`, pct: 100 };
     const d = E.describe(n.r);
-    return { text: `Next: ${d.cond}`, pct: Math.round(n.pr * 100) };
+    const then = d.then.length > 44 ? d.then.slice(0, 43) + '…' : d.then;
+    return { text: `${cnt} · next: ${d.cond} → ${then}`, pct: Math.round(n.pr * 100) };
   }
   function sortPets(list) {
     const l = list.slice();
@@ -120,7 +137,7 @@
     const nx = nextHtml(p);
     const pal = palFor(p);
     return `<li><button class="tile" ${i === 0 ? 'data-primary' : ''} data-pet="${p.id}" data-sig="${esc(sig(p))}" aria-label="${esc(p.name)}, ticker ${esc(p.ticker)}">
-      <span class="terrarium" ${terr(p.species)}>${spriteFor(p, 8)}<span class="mood-tag">${p.mood}</span></span>
+      <span class="terrarium" ${terr(p.species)}>${spriteFor(p, 8)}<span class="mood-tag">${p.mood}</span>${p.mine ? '<span class="mood-tag mine-tag">yours</span>' : ''}</span>
       <span class="tile-info">
         <span class="tile-name"><b data-f="name">${esc(p.name)}</b><i>$${esc(p.ticker)}</i></span>
         <span class="tile-stats"><span data-f="mc">${E.fmtUsd(p.mc)}</span><span data-f="chg" class="${p.chg >= 0 ? 'up' : 'down'}">${E.fmtPct(p.chg)}</span><small>1h</small></span>
@@ -140,7 +157,7 @@
       const f = hatchState.filter;
       return `<section>
         <div class="hatch-head">
-          <div><h2>The hatchery</h2><p class="sub">${pets.length} pets are alive and following their own rules. Open one to read its diary.</p></div>
+          <div><h2>The hatchery</h2><p class="sub">${pets.length} pets, and each one does only what its creator’s rules say. Open one to read its rules and its diary.</p></div>
           <div class="chips" role="group" aria-label="Sort pets" style="margin:0">
             <button class="chip" data-filter="hot" aria-pressed="${f === 'hot'}">Hot</button>
             <button class="chip" data-filter="new" aria-pressed="${f === 'new'}">Newborn</button>
@@ -167,6 +184,7 @@
         const tk = $('#ticker', root); if (tk) tk.innerHTML = tickerHtml();
       }));
       unsub.push(API.on('spawn', () => App.refresh()));
+      unsub.push(API.on('update', () => App.refresh()));
       this.off = () => unsub.forEach(f => f());
     },
     tick(root) {
@@ -242,7 +260,7 @@
             <h2 class="pet-name"><span data-f="name">${esc(p.name)}</span><small>$${esc(p.ticker)}</small></h2>
             <p class="pet-desc">${esc(p.desc || '')}</p>
             <div class="ca"><code title="${esc(p.ca)}">${esc(p.ca.slice(0, 6))}…${esc(p.ca.slice(-6))}</code><button class="btn sm alt" data-copy>Copy address</button></div>
-            <div class="pet-actions"><button class="btn hot" data-buy>Buy $${esc(p.ticker)}</button><button class="btn alt" data-clone>Clone these rules</button></div>
+            <div class="pet-actions">${API.canEdit(p) ? '<button class="btn hot" data-edit data-primary>Edit rules</button>' : ''}<button class="btn ${API.canEdit(p) ? 'alt' : 'hot'}" data-buy>Buy $${esc(p.ticker)}</button><button class="btn alt" data-clone>Clone these rules</button></div>
           </div>
           <div>
             <div class="stat-row">
@@ -251,9 +269,11 @@
               <div class="stat"><span>Holders</span><b data-f="holders"></b></div>
               <div class="stat"><span>1h change</span><b data-f="chg"></b></div>
             </div>
-            <div class="panel chart"><canvas id="chart" width="200" height="76" role="img" aria-label="Market cap over time with rule triggers marked"></canvas>
-              <p class="chart-cap">Dashed lines mark the market cap triggers in this pet’s rules. They turn solid pink once fired.</p></div>
-            <div class="section"><h3>Rules it follows</h3><ul class="rule-list" id="rules">${p.rules.map(r => ruleCardHtml(r, p)).join('')}</ul></div>
+            <div class="section rules-sec"><h3>The rules ${esc(p.name)} follows</h3>
+              <p class="creator-note">${API.canEdit(p) ? 'You wrote these. Rewrite them any time and the coin follows the new ones.' : 'Set by its creator. The coin does exactly this and nothing else.'}</p>
+              <ul class="rule-list" id="rules">${p.rules.map(r => ruleCardHtml(r, p)).join('')}</ul></div>
+            <div class="section"><div class="panel chart"><canvas id="chart" width="200" height="76" role="img" aria-label="Market cap over time with rule triggers marked"></canvas>
+              <p class="chart-cap">Dashed lines mark the market cap triggers in its rules. They turn solid pink once fired.</p></div></div>
             <div class="section"><h3>Diary</h3><ul class="log" id="log">${logHtml(p)}</ul></div>
           </div>
         </div></section>`;
@@ -267,6 +287,7 @@
           try { navigator.clipboard.writeText(p.ca); } catch (err) { /* clipboard blocked */ }
           App.toast('Address copied');
         }
+        if (e.target.closest('[data-edit]')) App.go('rules', { edit: p.id });
         if (e.target.closest('[data-buy]')) { window.dispatchEvent(new CustomEvent('rulepets:buy', { detail: p })); App.toast(`Opening $${p.ticker}`); }
         if (e.target.closest('[data-clone]')) {
           draft.species = p.species; draft.color = p.color; draft.rules = p.rules.map(r => E.rule({ metric: r.metric, op: r.op, value: r.value, action: r.action, param: r.param, repeat: r.repeat }));
@@ -290,6 +311,7 @@
         const tmp = document.createElement('div'); tmp.innerHTML = fresh;
         const nw = tmp.firstElementChild;
         $('[data-f="bar"]', card).style.width = $('[data-f="bar"]', nw).style.width;
+        if (r.state === 'fired' && r.lastTick === E.world.tick) { card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash'); }
         const st = $('[data-f="state"]', card); st.textContent = $('[data-f="state"]', nw).textContent; st.className = $('[data-f="state"]', nw).className;
       });
       if (this.logN !== p.log.length + ':' + (p.log[0] && p.log[0].t)) {
@@ -372,14 +394,19 @@
       <div class="slot-end"><span class="hit-badge" aria-hidden="true">fires</span><button class="btn sm alt" data-eject aria-label="Eject cartridge">Eject</button></div></li>`;
   }
   const emptySlot = `<li class="slot empty">Empty slot. Pick a cartridge below.</li>`;
-  const slotsHtml = () => draft.rules.map(slotHtml).join('') + Array.from({ length: MAX_SLOTS - draft.rules.length }, () => emptySlot).join('');
+  const slotsHtml = () => T().rules.map(slotHtml).join('') + Array.from({ length: MAX_SLOTS - T().rules.length }, () => emptySlot).join('');
 
   const rules = {
-    render() {
-      const sp = S.SPECIES[draft.species];
+    render(params) {
+      params = params || {};
+      const target = params.edit && API.pet(params.edit);
+      editing = target && API.canEdit(target) ? { id: target.id, name: target.name, species: target.species, color: target.color, rules: target.rules.map(r => E.rule({ metric: r.metric, op: r.op, value: r.value, action: r.action, param: r.param, repeat: r.repeat })) } : null;
+      const sp = S.SPECIES[T().species];
       return `<section>
-        <h2>Cartridge bay</h2>
-        <p class="sub">Each cartridge is one rule: an if and a then. Slot up to ${MAX_SLOTS}. Your pet follows every one, forever.</p>
+        ${editing
+          ? `<h2>Rewrite ${esc(editing.name)}’s rules</h2><p class="sub">Changes go live on the coin the moment you save. Each change is written in its diary.</p>
+             <div class="editbar"><button class="btn hot" data-save data-primary>Save to ${esc(editing.name)}</button><button class="btn alt" data-cancel>Cancel</button></div>`
+          : `<h2>Cartridge bay</h2><p class="sub">Each cartridge is one rule: an if and a then. Slot up to ${MAX_SLOTS}. Your pet does exactly these things and nothing else.</p>`}
         <div class="editor">
           <div>
             <ul class="slots" id="slots">${slotsHtml()}</ul>
@@ -388,17 +415,17 @@
           </div>
           <aside class="bench panel" aria-label="Test bench">
             <h3>Test bench</h3>
-            <div class="picker"><button class="btn sm" data-species="-1" aria-label="Previous pet body">Prev</button><output id="spName" aria-live="polite">${sp.label}</output><button class="btn sm" data-species="1" aria-label="Next pet body">Next</button></div>
-            <div class="terrarium" id="bTerr" ${terr(draft.species)}><p class="bubble" id="bSay">…</p>${S.sprite(draft.species, { scale: 8, pal: palFor(draftPet()) })}</div>
+            <div class="picker"${editing ? ' hidden' : ''}><button class="btn sm" data-species="-1" aria-label="Previous pet body">Prev</button><output id="spName" aria-live="polite">${sp.label}</output><button class="btn sm" data-species="1" aria-label="Next pet body">Next</button></div>
+            <div class="terrarium" id="bTerr" ${terr(T().species)}><p class="bubble" id="bSay">…</p>${S.sprite(T().species, { scale: 8, pal: palFor(T()) })}</div>
             ${BENCH.map(([k, t]) => `<label class="slide"><span>${t}</span><output data-out="${k}"></output><input type="range" min="0" max="100" value="${bench[k]}" data-bench="${k}"></label>`).join('')}
             <p class="bench-note">Drag the numbers. Any cartridge whose “if” becomes true lights up, and the pet acts it out.</p>
           </aside>
         </div></section>`;
     },
-    themeFor() { return draft.species; },
+    themeFor() { return T().species; },
     mount(root) {
       const slots = $('#slots', root);
-      const ruleOf = el => draft.rules.find(r => r.id === el.closest('[data-rule]').dataset.rule);
+      const ruleOf = el => T().rules.find(r => r.id === el.closest('[data-rule]').dataset.rule);
       const listFor = (r, field) => {
         if (field === 'metric') return Object.keys(E.METRICS);
         if (field === 'op') return ['>=', '<='];
@@ -423,11 +450,11 @@
       }
       function redrawSlot(r, focusSel) {
         const el = $(`[data-rule="${r.id}"]`, slots);
-        const i = draft.rules.indexOf(r);
+        const i = T().rules.indexOf(r);
         const tmp = document.createElement('div'); tmp.innerHTML = slotHtml(r, i);
         el.replaceWith(tmp.firstElementChild);
         if (focusSel) { const f = $(`[data-rule="${r.id}"] ${focusSel}`, slots); if (f) f.focus({ preventScroll: true }); }
-        saveDraft(); refreshBench();
+        persist(); refreshBench();
       }
       slots.addEventListener('click', e => {
         const r = e.target.closest('[data-rule]') && ruleOf(e.target);
@@ -439,7 +466,7 @@
         if (e.target.closest('[data-eject]')) {
           const el = e.target.closest('.slot'); App.sfx('eject');
           el.classList.add('ejecting');
-          setTimeout(() => { draft.rules = draft.rules.filter(x => x !== r); saveDraft(); slots.innerHTML = slotsHtml(); refreshBench(); const f = $('[data-add]', root); if (f) f.focus({ preventScroll: true }); }, 300);
+          setTimeout(() => { T().rules = T().rules.filter(x => x !== r); persist(); slots.innerHTML = slotsHtml(); refreshBench(); const f = $('[data-add]', root); if (f) f.focus({ preventScroll: true }); }, 300);
           return;
         }
         if (!cycEl) return;
@@ -459,18 +486,25 @@
         }
       });
       slots.addEventListener('input', e => {
-        if (e.target.classList.contains('txt')) { const r = ruleOf(e.target); r.param = e.target.value; saveDraft(); refreshBench(); }
+        if (e.target.classList.contains('txt')) { const r = ruleOf(e.target); r.param = e.target.value; persist(); refreshBench(); }
       });
       slots.addEventListener('keydown', e => {
         if (e.target.classList.contains('num') && e.key === 'Enter') e.target.blur();
       });
 
       root.addEventListener('click', e => {
+        if (e.target.closest('[data-save]')) {
+          const id = editing.id, name = editing.name;
+          if (!T().rules.length) { App.toast('Keep at least one cartridge.'); App.sfx('back'); return; }
+          API.updateRules(id, T().rules).then(() => { editing = null; App.sfx('hatch'); App.toast(`${name} follows the new rules`); App.go('pet', { id }, { silent: true }); });
+          return;
+        }
+        if (e.target.closest('[data-cancel]')) { const id = editing.id; editing = null; App.go('pet', { id }, { silent: true }); return; }
         const add = e.target.closest('[data-add]');
         if (add) {
-          if (draft.rules.length >= MAX_SLOTS) { App.toast(`All ${MAX_SLOTS} slots are full. Eject one first.`); App.sfx('back'); return; }
+          if (T().rules.length >= MAX_SLOTS) { App.toast(`All ${MAX_SLOTS} slots are full. Eject one first.`); App.sfx('back'); return; }
           const r = E.rule({ action: add.dataset.add, metric: 'mc', value: 10000 });
-          draft.rules.push(r); saveDraft(); App.sfx('clunk');
+          T().rules.push(r); persist(); App.sfx('clunk');
           slots.innerHTML = slotsHtml();
           const el = $(`[data-rule="${r.id}"]`, slots); el.classList.add('inserting');
           el.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -478,12 +512,12 @@
         }
         const sp = e.target.closest('[data-species]');
         if (sp) {
-          const k = S.KEYS, i = k.indexOf(draft.species);
-          draft.species = k[(i + (+sp.dataset.species) + k.length) % k.length]; draft.color = null; saveDraft(); App.sfx('tick');
-          $('#spName', root).textContent = S.SPECIES[draft.species].label;
+          const k = S.KEYS, i = k.indexOf(T().species);
+          T().species = k[(i + (+sp.dataset.species) + k.length) % k.length]; T().color = null; persist(); App.sfx('tick');
+          $('#spName', root).textContent = S.SPECIES[T().species].label;
           const tt = $('#bTerr', root);
-          const tr = S.SPECIES[draft.species].terrarium; tt.dataset.pat = tr.pat; tt.style.setProperty('--tbg', tr.bg); tt.style.setProperty('--tfg', tr.fg);
-          applyTheme(draft.species); benchSig = ''; refreshBench();
+          const tr = S.SPECIES[T().species].terrarium; tt.dataset.pat = tr.pat; tt.style.setProperty('--tbg', tr.bg); tt.style.setProperty('--tfg', tr.fg);
+          applyTheme(T().species); benchSig = ''; refreshBench();
         }
       });
       root.addEventListener('input', e => {
@@ -496,7 +530,7 @@
         const st = benchStats();
         BENCH.forEach(([k]) => { const o = $(`[data-out="${k}"]`, root); if (o) o.textContent = E.METRICS[k].fmt(st[k]); });
         const looks = []; let say = null, anyHit = false;
-        draft.rules.forEach(r => {
+        T().rules.forEach(r => {
           const hit = E.holds(r, st);
           const el = $(`[data-rule="${r.id}"]`, slots); if (el) el.classList.toggle('hit', hit);
           if (!hit) return; anyHit = true;
@@ -505,10 +539,10 @@
           else if (!say) say = { image: 'new look!', burn: 'burning supply.', buyback: 'buying the dip.', airdrop: 'gift time!', rename: `call me ${r.param}.` }[r.action];
         });
         const mood = st.chg >= 12 ? 'hyped' : st.chg <= -14 ? 'scared' : st.vol < Math.max(3000, st.mc * 0.25) ? 'bored' : 'happy';
-        const s = draft.species + looks.join() + mood + draft.color;
+        const s = T().species + looks.join() + mood + T().color;
         const sp = $('#bTerr .sprite', root);
-        if (s !== benchSig && sp) { sp.outerHTML = S.sprite(draft.species, { scale: 8, mood, looks, pal: palFor(draftPet()) }); benchSig = s; }
-        $('#bSay', root).textContent = say || (anyHit ? '…' : E.pick(S.SPECIES[draft.species].voice.idle));
+        if (s !== benchSig && sp) { sp.outerHTML = S.sprite(T().species, { scale: 8, mood, looks, pal: palFor(T()) }); benchSig = s; }
+        $('#bSay', root).textContent = say || (anyHit ? '…' : E.pick(S.SPECIES[T().species].voice.idle));
       }
       refreshBench();
     }
@@ -519,13 +553,13 @@
     const rl = draft.rules;
     return `<h3>Contract receipt</h3>
       ${rl.length ? `<ul style="list-style:none;margin:0;padding:0;display:grid;gap:7px">${rl.map(r => { const d = E.describe(r); return `<li>${esc(d.cond.replace(/^./, c => c.toUpperCase()))}<br><span>→ ${esc(d.then)}${r.repeat ? ', every time' : ''}</span></li>`; }).join('')}</ul>` : '<p>No cartridges yet.</p>'}
-      <dl><dt>Network</dt><dd>Solana</dd><dt>Supply</dt><dd>1,000,000,000</dd><dt>Rules</dt><dd>${rl.length} of ${MAX_SLOTS}</dd><dt>Dev buy</dt><dd>${draft.devBuy} SOL</dd></dl>`;
+      <dl><dt>Network</dt><dd>Solana</dd><dt>Supply</dt><dd>1,000,000,000</dd><dt>Rules</dt><dd>${rl.length} of ${MAX_SLOTS}</dd><dt>Dev buy</dt><dd>${draft.devBuy} SOL</dd><dt>Rules editable by</dt><dd>You</dd></dl>`;
   }
   const launch = {
     render() {
       return `<section>
         <h2>Hatch your pet</h2>
-        <p class="sub">Name it, pick its body, check the receipt, then hold the button. Rules are locked in once it hatches.</p>
+        <p class="sub">Name it, pick its body, check the receipt, then hold the button. You can rewrite its rules any time after it hatches.</p>
         <div class="launch">
           <form id="lform" novalidate onsubmit="return false">
             <div class="row2">
@@ -622,12 +656,14 @@
         ov.innerHTML = `<div class="hatch"><div class="confetti">${Array.from({ length: 26 }, () => `<i style="--x:${Math.round(Math.random() * 440 - 220)}px;--y:${Math.round(-Math.random() * 240 - 20)}px;--k:${COLORS[Math.floor(Math.random() * 6)]}"></i>`).join('')}</div>
           ${S.sprite(pet.species, { scale: 10, mood: 'hyped', pal: palFor(pet), label: pet.name })}
           <h2>${esc(pet.name)} hatched.</h2><p class="sub">$${esc(pet.ticker)} is live and following ${pet.rules.length} rule${pet.rules.length === 1 ? '' : 's'}.</p><code>${esc(pet.ca)}</code>
-          <div class="boot-actions" style="justify-content:center"><button class="btn big hot" data-view="${pet.id}" data-primary>Meet ${esc(pet.name)}</button><button class="btn big alt" data-close>Back to the hatchery</button></div></div>`;
+          <div class="boot-actions" style="justify-content:center"><button class="btn big hot" data-view="${pet.id}" data-primary>Meet ${esc(pet.name)}</button><button class="btn big alt" data-edit-rules="${pet.id}">Edit its rules</button><button class="btn big alt" data-close>Back to the hatchery</button></div></div>`;
         draft.name = ''; draft.ticker = ''; draft.desc = ''; draft.image = null; saveDraft();
         App.focusFirst(ov);
         ov.onclick = e => {
           const v = e.target.closest('[data-view]'), c = e.target.closest('[data-close]');
           if (v) { ov.hidden = true; ov.innerHTML = ''; App.go('pet', { id: v.dataset.view }); }
+          const ed = e.target.closest('[data-edit-rules]');
+          if (ed) { ov.hidden = true; ov.innerHTML = ''; App.go('rules', { edit: ed.dataset.editRules }); }
           if (c) { ov.hidden = true; ov.innerHTML = ''; App.go('hatchery'); }
         };
       }

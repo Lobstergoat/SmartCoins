@@ -226,7 +226,7 @@ input:focus-visible, textarea:focus-visible { animation: none; }
 .tile-name i { font: 600 14px/1 var(--f-px); font-style: normal; }
 .tile-stats { display: flex; align-items: baseline; gap: 10px; font: 700 17px/1 var(--f-px); }
 .tile-stats small { font-size: 13px; font-weight: 600; font-family: var(--f-px); }
-.tile-next { font-size: 12.5px; line-height: 1.25; font-weight: 600; min-height: 2.5em; }
+.tile-next { font-size: 12.5px; line-height: 1.25; font-weight: 600; min-height: 5em; }
 .tile.flash { animation: pop .9s steps(6); }
 .tile.new-egg { background: transparent; box-shadow: none; outline: 3px dashed var(--ink); outline-offset: -3px; display: grid; place-content: center; justify-items: center; gap: 10px; padding: 18px; text-align: center; min-height: 250px; animation: none; }
 .tile.new-egg:focus-visible, .tile.new-egg.cur { outline: 3px solid var(--ink); outline-offset: 3px; animation: cursor .8s steps(1) infinite; }
@@ -264,6 +264,18 @@ input:focus-visible, textarea:focus-visible { animation: none; }
 .log time { font: 600 13px/1.5 var(--f-px); }
 .log li.fresh { animation: pop .9s steps(6); }
 .empty { font-weight: 600; padding: 6px 0; }
+
+/* rules-first cues */
+.reel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 18px; padding: 10px 12px; background: var(--hi); box-shadow: var(--notch); margin-left: 3px; max-width: 52ch; font: 700 17px/1.2 var(--f-px); }
+.reel-k { background: var(--ink); color: var(--bg); padding: 4px 7px; }
+.reel-c { background: var(--c-sky); color: #232A12; padding: 4px 8px; animation: reelin .5s steps(5) both; }
+.reel-t { background: var(--c-pink); }
+.reel-cap { margin: 10px 0 0 3px; font-weight: 800; font-size: 15px; }
+.creator-note { margin: -2px 0 12px; font-weight: 700; }
+.editbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.mine-tag { right: auto; left: 8px; background: var(--hot); color: #2a0f20; }
+.rule-card.flash { animation: pop .9s steps(6); }
+@keyframes reelin { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 
 /* ───────────── pet-dex ───────────── */
 .dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 22px; margin-top: 20px; list-style: none; padding: 3px; }
@@ -444,3 +456,6 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 22px; border: 3px s
   .ticker-track { width: auto; flex-wrap: wrap; }
   .ticker { max-height: 3.4em; }
 }
+
+.screen-root { min-height: 100%; display: flex; flex-direction: column; }
+.screen-root > section { flex: 1; }

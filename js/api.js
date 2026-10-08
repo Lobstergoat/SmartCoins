@@ -4,7 +4,7 @@
    websocket calls and keep the shapes the same.
 
    Pet shape the UI expects:
-   { id, name, ticker, species, color|null, desc, ca,
+   { id, name, ticker, species, color|null, desc, ca, mine (true if the viewer created it),
      mc, vol, holders, chg, age,            // numbers: USD, USD, count, % over 1h, hours
      burned, looks[], mood, hist[],         // hist: recent market-cap samples, oldest first
      rules[{ id, metric, op, value, action, param, repeat, state }],
@@ -23,7 +23,7 @@
     pet: id => E.world.pets.find(p => p.id === id),
     /** Latest rule events across every pet. */
     events: () => E.world.events,
-    /** Subscribe to 'tick' (world updated), 'fire' ({pet, rule, entry}), 'spawn' (pet). Returns unsubscribe. */
+    /** Subscribe to 'tick' (world updated), 'fire' ({pet, rule, entry}), 'spawn' (pet), 'update' (pet, after rules change). Returns unsubscribe. */
     on: E.on,
     connect: () => E.start(),
     /**
@@ -31,6 +31,10 @@
      * Resolve with the created pet (with a real mint address).
      */
     launch: draft => new Promise(resolve => setTimeout(() => resolve(E.spawn(draft)), 650)),
+    /** Can the current user rewrite this pet's rules? Backend: compare pet.owner to the connected wallet. */
+    canEdit: p => !!p.mine,
+    /** Save new rules on a live pet. rules[] use the same shape as a launch draft. Resolve with the updated pet. */
+    updateRules: (id, rules) => new Promise(resolve => setTimeout(() => resolve(E.updateRules(E.world.pets.find(p => p.id === id), rules)), 250)),
     /** Wallet hook — return the connected address or null. */
     wallet: () => null
   };

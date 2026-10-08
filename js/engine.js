@@ -113,7 +113,7 @@
     return {
       id: o.id || nextId('p'),
       name: o.name, ticker: o.ticker, species: o.species, color: o.color || null,
-      desc: o.desc || '',
+      desc: o.desc || '', mine: !!o.mine,
       ca: o.ca || caFor(),
       mc, vol: o.vol || mc * 0.9, holders: o.holders || 12, chg: 0, age: o.age || 0,
       burned: 0, looks: [], mood: 'happy',
@@ -258,7 +258,7 @@
   function spawn(draft) {
     const p = makePet({
       name: draft.name, ticker: draft.ticker.toUpperCase(), species: draft.species, color: draft.color, desc: draft.desc,
-      rules: draft.rules, mc: 3200, holders: 1, age: 0, vola: 0.06, drift: 0.004
+      rules: draft.rules, mine: true, mc: 3200, holders: 1, age: 0, vola: 0.06, drift: 0.004
     });
     p.hist = [p.mc];
     p.say = 'hello world. i have rules.';
@@ -268,7 +268,19 @@
     return p;
   }
 
+  /** Replace a pet's rules. Unchanged rules keep their fired state; new or edited ones start armed. */
+  function updateRules(p, next) {
+    const key = r => [r.metric, r.op, r.value, r.action, r.param, r.repeat].join('|');
+    const old = new Map(p.rules.map(r => [key(r), r]));
+    const before = p.rules.length;
+    p.rules = next.map(r => old.get(key(r)) || rule({ metric: r.metric, op: r.op, value: r.value, action: r.action, param: r.param, repeat: r.repeat }));
+    addLog(p, 'rules', `Creator rewrote the rules (${before} → ${p.rules.length})`);
+    p.say = 'new rules. got it.';
+    emit('update', p);
+    return p;
+  }
+
   hydrate();
 
-  g.Engine = { METRICS, OPS, ACTIONS, LOOKS, LOOK_LABEL, TWEETS, TEMPLATES, world, on, rule, describe, holds, progress, moodOf, voiceFor, fmtUsd, fmtNum, fmtPct, start, tick, spawn, pick: a => a[Math.floor(Math.random() * a.length)] };
+  g.Engine = { METRICS, OPS, ACTIONS, LOOKS, LOOK_LABEL, TWEETS, TEMPLATES, world, on, rule, describe, holds, progress, moodOf, voiceFor, fmtUsd, fmtNum, fmtPct, start, tick, spawn, updateRules, pick: a => a[Math.floor(Math.random() * a.length)] };
 })(window);
