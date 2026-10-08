@@ -1,5 +1,5 @@
-/* PairPets — data adapter.
-   The interface reads and writes through window.PairPets only. Everything below runs against the
+/* Rulepets — data adapter.
+   The interface reads and writes through window.RulePets only. Everything below runs against the
    in-browser pet world in engine.js. To go live, replace the bodies of these functions with fetch /
    websocket calls and keep the shapes the same.
 
@@ -17,7 +17,7 @@
   'use strict';
   const E = g.Engine;
 
-  g.PairPets = {
+  g.RulePets = {
     /** Current pets, newest launches first. */
     pets: () => E.world.pets,
     pet: id => E.world.pets.find(p => p.id === id),

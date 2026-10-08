@@ -1,4 +1,4 @@
-/* PairPets — shell, LCD, components.
+/* Rulepets — shell, LCD, components.
    Layers: tokens → desk → plastic shell → LCD base → components → screens → motion. */
 
 @font-face { font-family: "Pixelify Sans"; src: url("../fonts/pixelify-400.ttf") format("truetype"); font-weight: 400 600; font-display: swap; }
