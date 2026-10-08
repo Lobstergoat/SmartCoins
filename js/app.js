@@ -212,6 +212,50 @@
   API.on('fire', ({ pet }) => { App.led(); if (cur.name === 'pet' && cur.params.id === pet.id) App.sfx('fire'); });
   API.on('spawn', () => drawBar());
 
+  /* ---------- mouse canvas: wheel zooms toward the cursor, drag pans, double-click the backdrop resets ---------- */
+  (function () {
+    if (!matchMedia('(pointer: fine)').matches) return; // touch keeps native pan and pinch
+    const body = document.body;
+    body.classList.add('canvas');
+    let x = 0, y = 0, k = 1, pan = null;
+    const reset = $('#resetView');
+    const apply = () => {
+      device.style.translate = `${x}px ${y}px`; device.style.scale = String(k);
+      reset.hidden = x === 0 && y === 0 && k === 1;
+      reset.textContent = `Reset view (${Math.round(k * 100)}%)`;
+    };
+    const home = () => { x = y = 0; k = 1; apply(); };
+    reset.addEventListener('click', home);
+
+    window.addEventListener('wheel', e => {
+      // over the screen, let the wheel scroll its content until it hits an end
+      const v = e.target.closest && e.target.closest('#view');
+      if (v && !e.ctrlKey && v.scrollHeight > v.clientHeight + 1) {
+        const atTop = v.scrollTop <= 0, atEnd = v.scrollTop + v.clientHeight >= v.scrollHeight - 1;
+        if ((e.deltaY > 0 && !atEnd) || (e.deltaY < 0 && !atTop)) return;
+      }
+      e.preventDefault();
+      const r = device.getBoundingClientRect();
+      const L = r.left - x, T = r.top - y;
+      const nk = Math.max(0.3, Math.min(3, k * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0016))));
+      const ux = (e.clientX - L - x) / k, uy = (e.clientY - T - y) / k;
+      x = e.clientX - L - nk * ux; y = e.clientY - T - nk * uy; k = nk;
+      apply();
+    }, { passive: false });
+
+    const free = e => !e.target.closest('button, input, textarea, label, a, select, canvas, .speaker') &&
+      !(e.target.id === 'view' && e.offsetX > e.target.clientWidth); // not on the screen's scrollbar
+    window.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'touch' || e.button !== 0 || !free(e)) return;
+      pan = { sx: e.clientX - x, sy: e.clientY - y };
+      body.classList.add('panning');
+    });
+    window.addEventListener('pointermove', e => { if (pan) { x = e.clientX - pan.sx; y = e.clientY - pan.sy; apply(); } });
+    const stop = () => { pan = null; body.classList.remove('panning'); };
+    window.addEventListener('pointerup', stop); window.addEventListener('pointercancel', stop); window.addEventListener('blur', stop);
+    window.addEventListener('dblclick', e => { if (free(e)) home(); });
+  })();
+
   window.App = App;
   API.connect();
   window.addEventListener('hashchange', route);
