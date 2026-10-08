@@ -63,9 +63,17 @@
   App.led = () => { const l = $('#ledFire'); l.classList.add('on'); clearTimeout(ledT); ledT = setTimeout(() => l.classList.remove('on'), 280); };
 
   /* ---------- status bar ---------- */
+  const short = a => a.slice(0, 4) + '…' + a.slice(-4);
+  const walletHtml = () => {
+    const a = API.wallet();
+    return a
+      ? `<button class="wallet on" data-wallet aria-label="Phantom connected as ${a}. Select to disconnect."><i></i><span>${short(a)}</span></button>`
+      : `<button class="wallet" data-wallet aria-label="Connect Phantom wallet">Connect<span class="w-long">&nbsp;Phantom</span></button>`;
+  };
   function drawBar() {
     const active = cur.name === 'pet' ? 'hatchery' : cur.name;
     bar.innerHTML = S.order.map(k => `<button class="tab" data-go="${k}" ${active === k ? 'aria-current="page"' : ''}>${Sp.icon(S.icons[k], 2)}<span>${S.labels[k]}</span></button>`).join('') +
+      walletHtml() +
       `<span class="live" aria-label="${API.pets().length} pets live"><i></i><span>${API.pets().length} live</span></span>`;
   }
 
@@ -205,12 +213,28 @@
   $('#lcd').addEventListener('click', e => {
     const go = e.target.closest('[data-go]');
     if (go) App.go(go.dataset.go);
+    if (e.target.closest('[data-wallet]')) toggleWallet();
   });
 
   /* ---------- live world ---------- */
   API.on('tick', () => { if (cur.mod && cur.mod.tick && overlay.hidden) cur.mod.tick(root); });
   API.on('fire', ({ pet }) => { App.led(); if (cur.name === 'pet' && cur.params.id === pet.id) App.sfx('fire'); });
   API.on('spawn', () => drawBar());
+  API.on('wallet', a => { drawBar(); if (a) App.toast('Phantom connected: ' + short(a)); });
+
+  let walletBusy = false;
+  async function toggleWallet() {
+    if (walletBusy) return; walletBusy = true;
+    try {
+      if (API.wallet()) { await API.disconnectWallet(); App.toast('Phantom disconnected'); }
+      else { await API.connectWallet(); App.sfx('ok'); }
+    } catch (err) {
+      if (err && err.message === 'no-phantom') { App.toast('Phantom isn’t installed. Opening phantom.app'); window.open('https://phantom.app/', '_blank', 'noopener'); }
+      else if (err && err.code === 4001) App.toast('Connection cancelled');
+      else App.toast('Couldn’t reach Phantom. Try again.');
+      App.sfx('back');
+    } finally { walletBusy = false; drawBar(); }
+  }
 
   /* ---------- mouse canvas: wheel zooms toward the cursor, drag pans, double-click the backdrop resets ---------- */
   (function () {

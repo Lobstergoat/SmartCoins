@@ -113,7 +113,7 @@ button { font: inherit; color: inherit; }
 .tab { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; cursor: pointer; color: var(--bg); font: 600 15px/1 var(--f-px); padding: 8px 12px; }
 .tab[aria-current="page"] { background: var(--bg); color: var(--ink); }
 .tab .pxicon { flex: none; }
-.live { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; color: var(--bg); font: 600 14px/1 var(--f-px); padding-right: 6px; }
+.live { margin-left: 10px; display: inline-flex; align-items: center; gap: 8px; color: var(--bg); font: 600 14px/1 var(--f-px); padding-right: 6px; }
 .live i { width: 9px; height: 9px; background: var(--hot); animation: blink 1.2s steps(1) infinite; }
 
 .view { container-type: inline-size; height: calc(100% - 44px); overflow-y: auto; overflow-x: hidden; padding: 20px 22px 28px; outline: none; scrollbar-color: var(--ink) var(--lo); scrollbar-width: thin; }
@@ -470,3 +470,11 @@ body.canvas button, body.canvas label[for], body.canvas .cyc-v { cursor: pointer
 .reset-view { position: fixed; right: 16px; bottom: 16px; z-index: 40; padding: 10px 14px; border: 0; cursor: pointer; background: #232A12; color: var(--cream); font: 700 15px/1 var(--f-px); box-shadow: 0 -3px 0 #232A12, 0 3px 0 #232A12, -3px 0 0 #232A12, 3px 0 0 #232A12; }
 .reset-view[hidden] { display: none; }
 .reset-view:hover { background: var(--pink); color: #2a0f20; }
+
+/* Phantom connect */
+.wallet { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer; padding: 7px 12px; background: var(--hot); color: #2a0f20; font: 700 14px/1 var(--f-px); box-shadow: 0 -2px 0 var(--bg), 0 2px 0 var(--bg), -2px 0 0 var(--bg), 2px 0 0 var(--bg); margin-right: 4px; }
+.wallet:hover { transform: translateY(-1px); }
+.wallet.on { background: var(--bg); color: var(--ink); }
+.wallet.on i { width: 9px; height: 9px; background: #1fa34a; box-shadow: 0 0 0 2px var(--ink); }
+.wallet:focus-visible, .wallet.cur { outline-color: var(--bg); }
+@media (max-width: 920px) { .w-long { display: none; } }

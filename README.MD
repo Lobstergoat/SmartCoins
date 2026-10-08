@@ -40,7 +40,7 @@ All UI data goes through `window.RulePets` in `js/api.js`. The pet and rule shap
 - `pets()`, `pet(id)`, `events()` – current state
 - `on('tick' | 'fire' | 'spawn', fn)` – push updates (websocket handler goes here)
 - `launch(draft)` – called when the user finishes the hold-to-hatch. `draft` has `name, ticker, desc, species, color, image (data URL|null), devBuy, rules[]`. Resolve with the created pet.
-- `wallet()` – return the connected address
+- `wallet()` – the connected Phantom address (or `null`); `connectWallet()` / `disconnectWallet()` drive the status-bar button, and a `wallet` event fires on change. New pets store it as `pet.owner`.
 - The Buy button dispatches a `rulepets:buy` window event with the pet in `detail`.
 
 Rule vocabulary: metrics `mc | vol | holders | chg | age`, ops `>= | <=`, actions `image | tweet | burn | buyback | airdrop | rename`.
