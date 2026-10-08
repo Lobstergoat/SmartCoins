@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Rulepets</title>
+  <meta name="description" content="Launch a Solana token that follows your rules. Slot in a cartridge, set the if and the then, and watch your pet obey.">
+  <meta name="theme-color" content="#F2EBDD">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23B9A7FF' d='M2 0h4v1h1v4h-1v2h-4v-2h-1v-4h1z'/%3E%3Cpath fill='%23FF4FA3' d='M3 2h1v1h-1zM5 4h1v1h-1z'/%3E%3C/svg%3E">
+  <link rel="preload" href="fonts/pixelify-700.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <a class="skip" href="#view">Skip to screen</a>
+
+  <main class="stage">
+    <div class="device" id="device">
+      <div class="keyring" aria-hidden="true"></div>
+
+      <header class="shell-top">
+        <h1 class="wordmark">Rulepets</h1>
+        <p class="tagline">Rules in. Coin out.</p>
+        <div class="leds" aria-hidden="true">
+          <span class="led led-power" id="ledPower"></span>
+          <span class="led led-fire" id="ledFire"></span>
+        </div>
+      </header>
+
+      <div class="body">
+        <div class="side side-left">
+          <div class="dpad" role="group" aria-label="D-pad: move the cursor">
+            <button class="dp dp-up" data-dir="up" aria-label="Move up"><i></i></button>
+            <button class="dp dp-left" data-dir="left" aria-label="Move left"><i></i></button>
+            <button class="dp dp-right" data-dir="right" aria-label="Move right"><i></i></button>
+            <button class="dp dp-down" data-dir="down" aria-label="Move down"><i></i></button>
+            <span class="dp-hub" aria-hidden="true"></span>
+          </div>
+          <button class="speaker" id="speaker" aria-pressed="true" aria-label="Sound on">
+            <span></span><span></span><span></span><span></span><span></span>
+          </button>
+          <p class="sticker" aria-hidden="true">SOL<br><small>inside</small></p>
+        </div>
+
+        <div class="bezel">
+          <div class="lcd" id="lcd">
+            <nav class="statusbar" id="statusbar" aria-label="Screens"></nav>
+            <div class="view" id="view" tabindex="-1"></div>
+            <div class="overlay" id="overlay" hidden></div>
+            <div class="toasts" id="toasts" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="side side-right">
+          <div class="pbtns" role="group" aria-label="Action buttons">
+            <button class="pbtn pbtn-c" data-btn="c" aria-label="C: next screen"><b>C</b></button>
+            <button class="pbtn pbtn-b" data-btn="b" aria-label="B: back"><b>B</b></button>
+            <button class="pbtn pbtn-a" data-btn="a" aria-label="A: select"><b>A</b></button>
+            <span class="plabel plabel-c" aria-hidden="true">next</span>
+            <span class="plabel plabel-b" aria-hidden="true">back</span>
+            <span class="plabel plabel-a" aria-hidden="true">select</span>
+          </div>
+        </div>
+      </div>
+
+      <footer class="shell-foot">
+        <p>Keys: arrows move · Enter or Z selects · X or Esc goes back · C changes screen</p>
+      </footer>
+    </div>
+  </main>
+
+  <script src="js/sprites.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/screens.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

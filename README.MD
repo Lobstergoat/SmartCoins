@@ -1,21 +1,46 @@
-Use the installed design-elevation, interaction-design and design-systems skills. Build a completely original meme coin tech site. Do not make a standard crypto landing page. Study the attached reference images for the level of personality and polish, but do not copy their layout. Create a unique visual concept, unusual navigation, custom animations, strong typography, interactive character sections and a memorable layout. First propose three radically different creative directions before writing code.
+# Rulepets
 
-References:
+Launch a Solana token that follows your rules. Every coin is a pocket pet living on a handheld. You slot in rule cartridges ("if market cap reaches $10k, change image", "if 24h volume drops below $8k, tweet") and the pet carries them out on its own.
 
-https://rulr.fun/
-https://ludor.fun/
-https://desktop95.fun/
-https://playgroundpad.fun/
-https://raiderdesk.com/
-https://www.nextform.fun/
+This repo is the front end. It is plain HTML, CSS and JavaScript with no build step.
 
-They are all unique and fun
+```
+python3 -m http.server 8000   # then open http://localhost:8000
+```
 
-The site is "launch a sol token like a smart contract" you write the rules the token follows
-"if mc reaches 10k, change image"
-"if vol lower than 8k, tweet"
-Etc etc etc
+## How it works
 
-Build the fun interactive unique front end then i will add the backend, dont say that its a demo
+| Control | What it does |
+| --- | --- |
+| D-pad | Moves a blinking cursor between things on the screen. Left/right nudges sliders. |
+| A | Selects. On "Hold to hatch" it is a press-and-hold. |
+| B | Back. Closes overlays. |
+| C | Next screen: Hatchery, Pet-dex, Cartridges, Launch. |
 
-Use the skills you have
+Keyboard: arrows, Enter or Z, X or Esc, C. Everything on screen is also directly clickable and tappable.
+
+Screens: **Hatchery** (live pets and a ticker of rules that just fired), **Pet page** (stats, chart with rule triggers, rule status, diary), **Pet-dex** (starter critters such as the market cap pump pet or the volume watchdog), **Cartridges** (the rule editor with a test bench), **Launch** (name, body, receipt, hold to hatch).
+
+Each pet carries its own sprite, terrarium pattern, screen colour theme and voice. Deep links: `#hatchery`, `#dex`, `#rules`, `#launch`, `#pet/<id>`.
+
+## Files
+
+- `index.html` – the handheld shell
+- `css/styles.css` – shell, LCD, components, motion
+- `js/sprites.js` – pixel art, species palettes and themes
+- `js/engine.js` – rule model, evaluation, live pet world
+- `js/api.js` – **the data adapter. Replace this to connect the backend**
+- `js/screens.js` – the five screens
+- `js/app.js` – routing, D-pad cursor, buttons, sound
+
+## Connecting the backend
+
+All UI data goes through `window.RulePets` in `js/api.js`. The pet and rule shapes are documented at the top of that file.
+
+- `pets()`, `pet(id)`, `events()` – current state
+- `on('tick' | 'fire' | 'spawn', fn)` – push updates (websocket handler goes here)
+- `launch(draft)` – called when the user finishes the hold-to-hatch. `draft` has `name, ticker, desc, species, color, image (data URL|null), devBuy, rules[]`. Resolve with the created pet.
+- `wallet()` – return the connected address
+- The Buy button dispatches a `rulepets:buy` window event with the pet in `detail`.
+
+Rule vocabulary: metrics `mc | vol | holders | chg | age`, ops `>= | <=`, actions `image | tweet | burn | buyback | airdrop | rename`.
