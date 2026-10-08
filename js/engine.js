@@ -1,6 +1,6 @@
-/* Rulepets — rules engine and live pet world.
+/* PairPets — rules engine and live pet world.
    A rule is: { id, metric, op, value, action, param, repeat }.
-   The UI only talks to window.RulePets (see api.js); swap that adapter for real endpoints. */
+   The UI only talks to window.PairPets (see api.js); swap that adapter for real endpoints. */
 (function (g) {
   'use strict';
 

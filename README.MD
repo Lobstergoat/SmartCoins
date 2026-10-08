@@ -1,4 +1,4 @@
-# Rulepets
+# PairPets
 
 Launch a Solana token that follows your rules. Every coin is a pocket pet living on a handheld. You slot in rule cartridges ("if market cap reaches $10k, change image", "if 24h volume drops below $8k, tweet") and the pet carries them out on its own.
 
@@ -35,12 +35,12 @@ Each pet carries its own sprite, terrarium pattern, screen colour theme and voic
 
 ## Connecting the backend
 
-All UI data goes through `window.RulePets` in `js/api.js`. The pet and rule shapes are documented at the top of that file.
+All UI data goes through `window.PairPets` in `js/api.js`. The pet and rule shapes are documented at the top of that file.
 
 - `pets()`, `pet(id)`, `events()` – current state
 - `on('tick' | 'fire' | 'spawn', fn)` – push updates (websocket handler goes here)
 - `launch(draft)` – called when the user finishes the hold-to-hatch. `draft` has `name, ticker, desc, species, color, image (data URL|null), devBuy, rules[]`. Resolve with the created pet.
 - `wallet()` – return the connected address
-- The Buy button dispatches a `rulepets:buy` window event with the pet in `detail`.
+- The Buy button dispatches a `pairpets:buy` window event with the pet in `detail`.
 
 Rule vocabulary: metrics `mc | vol | holders | chg | age`, ops `>= | <=`, actions `image | tweet | burn | buyback | airdrop | rename`.

@@ -1,4 +1,4 @@
-/* Rulepets — pixel art. Every critter is a character grid rendered to SVG.
+/* PairPets — pixel art. Every critter is a character grid rendered to SVG.
    Legend: o outline · b body · d shade · l light · a accent · e eye · p cheek · w white · k dark · g gold */
 (function (g) {
   'use strict';

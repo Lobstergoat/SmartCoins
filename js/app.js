@@ -1,7 +1,7 @@
-/* Rulepets — the handheld. Routing, D-pad spatial cursor, A/B/C buttons, sound, toasts. */
+/* PairPets — the handheld. Routing, D-pad spatial cursor, A/B/C buttons, sound, toasts. */
 (function (g) {
   'use strict';
-  const S = g.Screens, API = g.RulePets, Sp = g.Sprites;
+  const S = g.Screens, API = g.PairPets, Sp = g.Sprites;
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
   const view = $('#view'), bar = $('#statusbar'), overlay = $('#overlay'), device = $('#device');
@@ -21,7 +21,7 @@
 
   /* ---------- sound ---------- */
   let actx = null, muted = false;
-  try { muted = localStorage.getItem('rulepets.muted') === '1'; } catch (e) { /* ignore */ }
+  try { muted = localStorage.getItem('pairpets.muted') === '1'; } catch (e) { /* ignore */ }
   function tone(freq, dur, type, vol, when, slideTo) {
     if (muted) return;
     try {
@@ -49,7 +49,7 @@
 
   const speaker = $('#speaker');
   const syncSpeaker = () => { speaker.setAttribute('aria-pressed', String(!muted)); speaker.setAttribute('aria-label', muted ? 'Sound off' : 'Sound on'); };
-  speaker.addEventListener('click', () => { muted = !muted; try { localStorage.setItem('rulepets.muted', muted ? '1' : '0'); } catch (e) { /* ignore */ } syncSpeaker(); App.sfx('ok'); });
+  speaker.addEventListener('click', () => { muted = !muted; try { localStorage.setItem('pairpets.muted', muted ? '1' : '0'); } catch (e) { /* ignore */ } syncSpeaker(); App.sfx('ok'); });
   syncSpeaker();
 
   /* ---------- small helpers ---------- */

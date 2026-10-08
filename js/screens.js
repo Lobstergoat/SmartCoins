@@ -1,7 +1,7 @@
-/* Rulepets — screens. Each screen: render(params) → html, mount(root, params), tick(root), unmount(). */
+/* PairPets — screens. Each screen: render(params) → html, mount(root, params), tick(root), unmount(). */
 (function (g) {
   'use strict';
-  const E = g.Engine, S = g.Sprites, API = g.RulePets;
+  const E = g.Engine, S = g.Sprites, API = g.PairPets;
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -35,7 +35,7 @@
   function loadDraft() {
     const d = { name: '', ticker: '', desc: '', species: 'blob', color: null, image: null, devBuy: 0.5, rules: DEFAULT_RULES() };
     try {
-      const saved = JSON.parse(localStorage.getItem('rulepets.draft') || 'null');
+      const saved = JSON.parse(localStorage.getItem('pairpets.draft') || 'null');
       if (saved && Array.isArray(saved.rules)) { Object.assign(d, saved, { image: null }); d.rules = saved.rules.map(r => E.rule(r)); }
     } catch (e) { /* storage unavailable */ }
     return d;
@@ -45,7 +45,7 @@
   const T = () => editing || draft;
   const persist = () => { if (!editing) saveDraft(); };
   const saveDraft = () => {
-    try { localStorage.setItem('rulepets.draft', JSON.stringify(Object.assign({}, draft, { image: null, rules: draft.rules.map(r => ({ metric: r.metric, op: r.op, value: r.value, action: r.action, param: r.param, repeat: r.repeat })) }))); } catch (e) { /* ignore */ }
+    try { localStorage.setItem('pairpets.draft', JSON.stringify(Object.assign({}, draft, { image: null, rules: draft.rules.map(r => ({ metric: r.metric, op: r.op, value: r.value, action: r.action, param: r.param, repeat: r.repeat })) }))); } catch (e) { /* ignore */ }
   };
   const draftPet = () => ({ species: draft.species, color: draft.color, looks: [], mood: 'happy', name: draft.name || 'Your pet' });
 
@@ -288,7 +288,7 @@
           App.toast('Address copied');
         }
         if (e.target.closest('[data-edit]')) App.go('rules', { edit: p.id });
-        if (e.target.closest('[data-buy]')) { window.dispatchEvent(new CustomEvent('rulepets:buy', { detail: p })); App.toast(`Opening $${p.ticker}`); }
+        if (e.target.closest('[data-buy]')) { window.dispatchEvent(new CustomEvent('pairpets:buy', { detail: p })); App.toast(`Opening $${p.ticker}`); }
         if (e.target.closest('[data-clone]')) {
           draft.species = p.species; draft.color = p.color; draft.rules = p.rules.map(r => E.rule({ metric: r.metric, op: r.op, value: r.value, action: r.action, param: r.param, repeat: r.repeat }));
           saveDraft(); App.toast(`${p.name}’s cartridges are in your slots`); App.go('rules');
