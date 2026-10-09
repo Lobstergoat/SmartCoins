@@ -487,3 +487,27 @@ body.canvas button, body.canvas label[for], body.canvas .cyc-v { cursor: pointer
 .music.off::after { content: ""; position: absolute; left: 7px; right: 7px; top: 50%; height: 4px; margin-top: -2px; background: var(--pink); transform: rotate(-45deg); box-shadow: 0 0 0 2px var(--cream); }
 .music:not(.off) .pxicon { animation: bob 1s steps(2) infinite; }
 .shell-top .leds { margin-left: 4px; }
+
+/* roomier top bar: nothing wraps, and it collapses by the screen's own width, not the window's */
+.lcd { container-type: inline-size; container-name: lcd; }
+.tab, .wallet, .live { white-space: nowrap; flex: none; }
+.statusbar { gap: 4px; overflow: hidden; }
+@container lcd (max-width: 780px) {
+  .tab span { display: none; }
+  .tab[aria-current="page"] span { display: inline; }
+  .tab { padding: 8px 10px; }
+  .w-long, .live span { display: none; }
+}
+@container lcd (max-width: 560px) {
+  .tab[aria-current="page"] span { display: none; }
+  .tab { padding: 8px 12px; }
+}
+/* pet tiles: two comfortable columns instead of three cramped ones on a small screen */
+@container (max-width: 640px) {
+  .tiles { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+  .tile-name b { font-size: 19px; }
+}
+@media (max-width: 1300px) and (min-width: 921px) {
+  .device { padding-inline: 18px; }
+  .body { grid-template-columns: 132px minmax(0, 1fr) 132px; gap: 10px; }
+}
