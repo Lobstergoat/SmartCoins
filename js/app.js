@@ -63,7 +63,7 @@
   App.led = () => { const l = $('#ledFire'); l.classList.add('on'); clearTimeout(ledT); ledT = setTimeout(() => l.classList.remove('on'), 280); };
 
   /* ---------- status bar ---------- */
-  let walletTry = 0, walletPending = false; // see toggleWallet
+  let walletTry = 0, walletPending = false, walletSince = 0; // see toggleWallet
   const realCount = () => API.pets().filter(p => p.real).length;
   const short = a => a.slice(0, 4) + '…' + a.slice(-4);
   const walletHtml = () => {
@@ -272,12 +272,19 @@
 
   // No lock: if Phantom never answers (popup closed, window switched), every click must be able to try again.
   async function toggleWallet() {
+    const retryAfter = (window.RulePetsConfig && window.RulePetsConfig.walletRetryMs) || 10000;
+    if (!API.wallet() && API.walletPending() && Date.now() - walletSince < retryAfter) {
+      // Phantom already has our request. Say where to find it instead of stacking another one.
+      App.toast('Phantom is waiting for you. Open the Phantom extension and approve, or click again in a few seconds to resend.');
+      return;
+    }
     const mine = ++walletTry;
     try {
       if (API.wallet()) { await API.disconnectWallet(); App.toast('Phantom disconnected'); }
       else {
-        walletPending = true; drawBar();
-        await Promise.race([API.connectWallet(), new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { timeout: true })), 45000))]);
+        const resend = API.walletPending(); // it has been a while: send a fresh request
+        walletSince = Date.now(); walletPending = true; drawBar();
+        await Promise.race([API.connectWallet(resend), new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { timeout: true })), 45000))]);
         App.sfx('ok');
       }
     } catch (err) {
@@ -289,6 +296,7 @@
       App.sfx('back');
     } finally { if (mine === walletTry) { walletPending = false; drawBar(); } }
   }
+
 
 
   /* ---------- mouse canvas: wheel zooms toward the cursor, drag pans, double-click the backdrop resets ---------- */

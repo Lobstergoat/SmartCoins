@@ -6,5 +6,6 @@ window.RulePetsConfig = {
   pool: 'pump',
   slippage: 10,        // percent
   priorityFee: 0.0005, // SOL
+  walletRetryMs: 10000, // a stalled Phantom connect request can be re-sent after this long
   costBuffer: 0.03     // SOL kept free on top of the dev buy for rent, fees and priority fee
 };

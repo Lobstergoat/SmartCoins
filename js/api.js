@@ -28,7 +28,7 @@
     return p && p.isPhantom ? p : null;
   };
   const setAddr = pk => { const next = pk ? pk.toString() : null; if (next !== addr) { addr = next; E.emit('wallet', addr); } };
-  let hooked = false;
+  let hooked = false, inflight = null;
   const hook = p => {
     if (hooked) return; hooked = true;
     p.on && p.on('connect', pk => setAddr(pk));
@@ -93,10 +93,17 @@
     wallet: () => addr,
     hasWallet: () => !!provider(),
     /** Ask Phantom to connect. Rejects with Error('no-phantom') if it isn't installed, or Phantom's own error (code 4001 = user declined). */
-    connectWallet: async () => {
-      const p = provider(); if (!p) throw new Error('no-phantom');
-      hook(p); const r = await p.connect(); setAddr(r.publicKey || p.publicKey); return addr;
+    connectWallet: (force) => {
+      const p = provider(); if (!p) return Promise.reject(new Error('no-phantom'));
+      // Re-use a request that's still waiting on the user, so repeated clicks don't stack up approval popups in Phantom.
+      if (inflight && !force) return inflight;
+      hook(p);
+      const mine = inflight = Promise.resolve().then(() => p.connect()).then(r => { setAddr(r.publicKey || p.publicKey); return addr; })
+        .finally(() => { if (inflight === mine) inflight = null; });
+      return mine;
     },
+    /** True while a connect request is waiting for the user to approve it in Phantom. */
+    walletPending: () => !!inflight,
     disconnectWallet: async () => { const p = provider(); if (p) await p.disconnect(); setAddr(null); }
   };
 })(window);
