@@ -530,3 +530,4 @@ body.canvas button, body.canvas label[for], body.canvas .cyc-v { cursor: pointer
 .hatch-links a { font: 700 16px/1 var(--f-px); color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
 a.btn { display: inline-block; text-decoration: none; }
 .tile .mine-tag { right: auto; left: 8px; }
+.wallet.pending { animation: blink 1s steps(1) infinite; }

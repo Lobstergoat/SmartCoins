@@ -63,13 +63,16 @@
   App.led = () => { const l = $('#ledFire'); l.classList.add('on'); clearTimeout(ledT); ledT = setTimeout(() => l.classList.remove('on'), 280); };
 
   /* ---------- status bar ---------- */
+  let walletTry = 0, walletPending = false; // see toggleWallet
   const realCount = () => API.pets().filter(p => p.real).length;
   const short = a => a.slice(0, 4) + '…' + a.slice(-4);
   const walletHtml = () => {
     const a = API.wallet();
     return a
       ? `<button class="wallet on" data-wallet aria-label="Phantom connected as ${a}. Select to disconnect."><i></i><span>${short(a)}</span></button>`
-      : `<button class="wallet" data-wallet aria-label="Connect Phantom wallet">Connect<span class="w-long">&nbsp;Phantom</span></button>`;
+      : walletPending
+        ? `<button class="wallet pending" data-wallet aria-label="Waiting for Phantom. Select to try again.">Waiting<span class="w-long">&nbsp;for Phantom…</span></button>`
+        : `<button class="wallet" data-wallet aria-label="Connect Phantom wallet">Connect<span class="w-long">&nbsp;Phantom</span></button>`;
   };
   function drawBar() {
     const active = cur.name === 'pet' ? 'hatchery' : cur.name;
@@ -265,21 +268,28 @@
   API.on('tick', () => { if (cur.mod && cur.mod.tick && overlay.hidden) cur.mod.tick(root); });
   API.on('fire', ({ pet }) => { App.led(); if (cur.name === 'pet' && cur.params.id === pet.id) App.sfx('fire'); });
   API.on('spawn', () => drawBar());
-  API.on('wallet', a => { drawBar(); if (a) App.toast('Phantom connected: ' + short(a)); if (cur.name === 'pet') App.refresh(); }); // edit rights depend on the wallet
+  API.on('wallet', a => { walletPending = false; drawBar(); if (a) App.toast('Phantom connected: ' + short(a)); if (cur.name === 'pet') App.refresh(); }); // edit rights depend on the wallet
 
-  let walletBusy = false;
+  // No lock: if Phantom never answers (popup closed, window switched), every click must be able to try again.
   async function toggleWallet() {
-    if (walletBusy) return; walletBusy = true;
+    const mine = ++walletTry;
     try {
       if (API.wallet()) { await API.disconnectWallet(); App.toast('Phantom disconnected'); }
-      else { await API.connectWallet(); App.sfx('ok'); }
+      else {
+        walletPending = true; drawBar();
+        await Promise.race([API.connectWallet(), new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { timeout: true })), 45000))]);
+        App.sfx('ok');
+      }
     } catch (err) {
+      if (mine !== walletTry) return; // a newer click has taken over
       if (err && err.message === 'no-phantom') { App.toast('Phantom isn’t installed. Opening phantom.app'); window.open('https://phantom.app/', '_blank', 'noopener'); }
       else if (err && err.code === 4001) App.toast('Connection cancelled');
-      else App.toast('Couldn’t reach Phantom. Try again.');
+      else if (err && err.timeout) App.toast('No answer from Phantom. Open its popup, or click Connect to try again.');
+      else App.toast('Couldn’t reach Phantom. Click Connect to try again.');
       App.sfx('back');
-    } finally { walletBusy = false; drawBar(); }
+    } finally { if (mine === walletTry) { walletPending = false; drawBar(); } }
   }
+
 
   /* ---------- mouse canvas: wheel zooms toward the cursor, drag pans, double-click the backdrop resets ---------- */
   (function () {
