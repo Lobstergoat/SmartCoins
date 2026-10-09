@@ -219,7 +219,7 @@
   /* ---------- background music: song.mp3, quiet, loops, starts on first interaction ---------- */
   (function () {
     const btn = $('#music');
-    const VOL = 0.16;
+    const VOL = 0.11;
     let on = true;
     try { on = localStorage.getItem('rulepets.music') !== '0'; } catch (e) { /* ignore */ }
     const audio = new Audio('song.mp3');
@@ -229,7 +229,7 @@
     let fade = 0;
     const ramp = (to, done) => {
       cancelAnimationFrame(fade);
-      const from = audio.volume, t0 = performance.now(), dur = 1500;
+      const from = audio.volume, t0 = performance.now(), dur = 500;
       const tick = now => {
         const p = Math.min(1, (now - t0) / dur); audio.volume = Math.max(0, Math.min(1, from + (to - from) * p));
         if (p < 1) fade = requestAnimationFrame(tick); else done && done();
