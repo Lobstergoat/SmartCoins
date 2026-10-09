@@ -23,6 +23,10 @@ Screens: **Hatchery** (live pets and a ticker of rules that just fired), **Pet p
 
 Each pet carries its own sprite, terrarium pattern, screen colour theme and voice. Deep links: `#hatchery`, `#dex`, `#rules`, `#launch`, `#pet/<id>`.
 
+## Music
+
+Drop your track in the repo root as `song.mp3`. It loops quietly (about 16% volume), fades in after the first click or key press (browsers block audio before that), and pauses when the tab is hidden. The round note button in the top bar mutes it, and the choice is remembered. If `song.mp3` is missing the button simply stays hidden.
+
 ## Files
 
 - `index.html` – the handheld shell

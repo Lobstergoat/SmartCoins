@@ -191,6 +191,7 @@
     buyback: ['.xxxxx.', 'x.....x', 'x.xxx.x', 'x.....x', '.xxxxx.'],
     airdrop: ['.xxxxx.', 'xxxxxxx', 'x.x.x.x', '.x.x.x.', '..xxx..'],
     rename: ['..xxxxx', '.x....x', 'x..x..x', '.x....x', '..xxxxx'],
+    note: ['.xxxxxx', '.x....x', '.x....x', '.x....x', 'xx...xx', 'xx...xx'],
     egg: ['.xxx.', 'xxxxx', 'xxxxx', 'xxxxx', '.xxx.'],
     book: ['xxxxx.', 'x...xx', 'x.x.xx', 'x...xx', 'xxxxx.'],
     chip: ['xxxxxxx', 'x.....x', 'x.xxx.x', 'x.....x', 'xxxxxxx', '.x.x.x.'],

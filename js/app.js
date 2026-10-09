@@ -216,6 +216,50 @@
     if (e.target.closest('[data-wallet]')) toggleWallet();
   });
 
+  /* ---------- background music: song.mp3, quiet, loops, starts on first interaction ---------- */
+  (function () {
+    const btn = $('#music');
+    const VOL = 0.16;
+    let on = true;
+    try { on = localStorage.getItem('rulepets.music') !== '0'; } catch (e) { /* ignore */ }
+    const audio = new Audio('song.mp3');
+    audio.loop = true; audio.volume = 0; audio.preload = 'auto';
+    btn.innerHTML = Sp.icon('note', 3);
+    const sync = () => { btn.setAttribute('aria-pressed', String(on)); btn.setAttribute('aria-label', on ? 'Music on. Select to mute.' : 'Music muted. Select to play.'); btn.title = on ? 'Mute music' : 'Play music'; btn.classList.toggle('off', !on); };
+    let fade = 0;
+    const ramp = (to, done) => {
+      cancelAnimationFrame(fade);
+      const from = audio.volume, t0 = performance.now(), dur = 1500;
+      const tick = now => {
+        const p = Math.min(1, (now - t0) / dur); audio.volume = Math.max(0, Math.min(1, from + (to - from) * p));
+        if (p < 1) fade = requestAnimationFrame(tick); else done && done();
+      };
+      fade = requestAnimationFrame(tick);
+    };
+    const play = () => {
+      if (!on) return;
+      audio.play().then(() => { ramp(VOL); removeStarters(); }).catch(() => { /* blocked until a gesture; starters stay armed */ });
+    };
+    const starters = ['pointerdown', 'keydown', 'touchend'];
+    const start = () => play();
+    const removeStarters = () => starters.forEach(ev => window.removeEventListener(ev, start, true));
+    starters.forEach(ev => window.addEventListener(ev, start, true));
+
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('click', () => {
+      on = !on; try { localStorage.setItem('rulepets.music', on ? '1' : '0'); } catch (e) { /* ignore */ }
+      sync();
+      if (on) { starters.forEach(ev => window.addEventListener(ev, start, true)); play(); }
+      else ramp(0, () => audio.pause());
+    });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) audio.pause(); else if (on && audio.currentTime >= 0 && !audio.error) play(); });
+
+    // only show the control once the file actually loads, so a missing song.mp3 never leaves a dead button
+    audio.addEventListener('loadedmetadata', () => { btn.hidden = false; sync(); });
+    audio.addEventListener('error', () => { btn.hidden = true; });
+    sync(); audio.load(); play();
+  })();
+
   /* ---------- live world ---------- */
   API.on('tick', () => { if (cur.mod && cur.mod.tick && overlay.hidden) cur.mod.tick(root); });
   API.on('fire', ({ pet }) => { App.led(); if (cur.name === 'pet' && cur.params.id === pet.id) App.sfx('fire'); });

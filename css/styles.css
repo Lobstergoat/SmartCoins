@@ -478,3 +478,12 @@ body.canvas button, body.canvas label[for], body.canvas .cyc-v { cursor: pointer
 .wallet.on i { width: 9px; height: 9px; background: #1fa34a; box-shadow: 0 0 0 2px var(--ink); }
 .wallet:focus-visible, .wallet.cur { outline-color: var(--bg); }
 @media (max-width: 920px) { .w-long { display: none; } }
+
+/* music toggle */
+.music { width: 40px; height: 40px; margin-left: auto; display: grid; place-items: center; position: relative; border: 0; border-radius: 50%; cursor: pointer; color: var(--shell-deep); background: var(--cream); box-shadow: inset 0 3px 0 #fff, inset 0 -4px 0 var(--cream-lo), 0 4px 0 var(--shell-deep); }
+.music[hidden] { display: none; }
+.music:active { transform: translateY(3px); box-shadow: inset 0 3px 0 #fff, inset 0 -3px 0 var(--cream-lo), 0 1px 0 var(--shell-deep); }
+.music:focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; animation: none; }
+.music.off::after { content: ""; position: absolute; left: 7px; right: 7px; top: 50%; height: 4px; margin-top: -2px; background: var(--pink); transform: rotate(-45deg); box-shadow: 0 0 0 2px var(--cream); }
+.music:not(.off) .pxicon { animation: bob 1s steps(2) infinite; }
+.shell-top .leds { margin-left: 4px; }
