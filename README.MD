@@ -23,6 +23,24 @@ Screens: **Hatchery** (live pets and a ticker of rules that just fired), **Pet p
 
 Each pet carries its own sprite, terrarium pattern, screen colour theme and voice. Deep links: `#hatchery`, `#dex`, `#rules`, `#launch`, `#pet/<id>`.
 
+## Launching a real token
+
+The Launch screen creates a real token on **pump.fun** from the connected Phantom wallet:
+
+1. It reads the wallet balance and refuses if `dev buy + ~0.03 SOL` isn't there.
+2. It uploads the image (the creator's file, or the species' pixel face rendered to a 512px PNG) and the name, ticker and description to pump.fun's metadata endpoint.
+3. It asks PumpPortal (`/api/trade-local`) for an unsigned `create` transaction with the **exact** dev buy, co-signs with a freshly generated mint key, and hands it to Phantom.
+4. Phantom shows the real amounts and the wallet owner approves. Nothing is spent before that.
+5. It waits for confirmation, then shows the mint address, pump.fun and Solscan links.
+
+Settings live in `js/config.js`. **Set `rpc` to your own endpoint** (Helius, QuickNode...): the public Solana RPC is rate-limited and will fail under real use. The Solana library is vendored in `vendor/` (`@solana/web3.js` 1.98.4).
+
+Launched tokens are remembered in the creator's browser (`localStorage`) until your backend lists them.
+
+**Tabs in the Hatchery:** *Newborn* lists real launches. *Examples* is a built-in simulation of eight sample pets and is labelled as such everywhere. *Biggest* mixes both. Real tokens show "—" for market cap, volume and holders until your backend reports them with `RulePets.pushStats(id, { mc, vol, holders, chg, age })`, which also runs that token's rules.
+
+**Not done by the front end:** pump.fun tokens can't carry rules on-chain. The cartridges are saved in the creator's browser; something on your backend has to watch the token and act on them (tweeting, burning, buying back and airdropping all need keys or API access the browser doesn't have).
+
 ## Music
 
 Drop your track in the repo root as `song.mp3`. It loops quietly (about 16% volume), fades in after the first click or key press (browsers block audio before that), and pauses when the tab is hidden. The round note button in the top bar mutes it, and the choice is remembered. If `song.mp3` is missing the button simply stays hidden.
@@ -34,6 +52,7 @@ Drop your track in the repo root as `song.mp3`. It loops quietly (about 16% volu
 - `js/sprites.js` – pixel art, species palettes and themes
 - `js/engine.js` – rule model, evaluation, live pet world
 - `js/api.js` – **the data adapter. Replace this to connect the backend**
+- `js/pump.js` – the pump.fun launch flow; `js/config.js` – RPC and launch settings; `vendor/` – the Solana library
 - `js/screens.js` – the five screens
 - `js/app.js` – routing, D-pad cursor, buttons, sound
 

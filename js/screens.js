@@ -15,6 +15,8 @@
   const terr = (species) => { const t = S.SPECIES[species].terrarium; return `data-pat="${t.pat}" style="--tbg:${t.bg};--tfg:${t.fg}"`; };
   const ago = t => { const s = (Date.now() - t) / 1000; if (s < 45) return 'just now'; if (s < 3600) return Math.round(s / 60) + 'm ago'; return Math.round(s / 3600) + 'h ago'; };
   const sig = p => [p.species, p.looks.join(), p.color].join('|');
+  const stat = (v, fmt) => (v == null ? '—' : fmt(v)); // real tokens have no numbers until the backend reports them
+  const fmtSol = n => (Number.isFinite(n) ? String(Math.round(n * 1e6) / 1e6) : '—');
   const swapMood = (el, mood) => { if (el) el.className = el.className.replace(/mood-\w+/, 'mood-' + mood); };
 
   function applyTheme(species) {
@@ -33,7 +35,7 @@
     E.rule({ metric: 'vol', op: '<=', value: 8000, action: 'tweet', param: E.TWEETS[0], repeat: true })
   ];
   function loadDraft() {
-    const d = { name: '', ticker: '', desc: '', species: 'blob', color: null, image: null, devBuy: 0.5, rules: DEFAULT_RULES() };
+    const d = { name: '', ticker: '', desc: '', species: 'blob', color: null, imageFile: null, devBuy: 0.5, rules: DEFAULT_RULES() };
     try {
       const saved = JSON.parse(localStorage.getItem('rulepets.draft') || 'null');
       if (saved && Array.isArray(saved.rules)) { Object.assign(d, saved, { image: null }); d.rules = saved.rules.map(r => E.rule(r)); }
@@ -62,7 +64,7 @@
             <button class="btn big hot" data-go="hatchery" data-primary>Enter the hatchery</button>
             <button class="btn big alt" id="hatchEgg">Hatch an egg</button>
           </div>
-          <p class="boot-live"><i></i><span id="bootCount">${API.pets().length} pets are following their rules right now.</span></p>
+          <p class="boot-live"><i></i><span>Tokens launch for real on pump.fun. The pets under Examples only show how rules work.</span></p>
         </div>
         <div class="egg-stage"><button class="egg-btn" id="egg" aria-label="Hatch a random pet">${S.sprite('egg', { scale: 14 })}</button></div>
       </section>`;
@@ -108,7 +110,8 @@
   };
 
   /* ================= HATCHERY ================= */
-  let hatchState = { filter: 'hot' };
+  const hatchState = { filter: null }; // null = pick a sensible default each time (Newborn once something has really launched)
+  const curFilter = () => hatchState.filter || (API.pets().some(p => !p.example) ? 'new' : 'examples');
   function nextRule(p) {
     let best = null;
     p.rules.forEach(r => {
@@ -126,47 +129,52 @@
     const then = d.then.length > 44 ? d.then.slice(0, 43) + '…' : d.then;
     return { text: `${cnt} · next: ${d.cond} → ${then}`, pct: Math.round(n.pr * 100) };
   }
-  function sortPets(list) {
-    const l = list.slice();
-    if (hatchState.filter === 'hot') l.sort((a, b) => b.chg - a.chg);
-    else if (hatchState.filter === 'new') l.sort((a, b) => a.age - b.age);
-    else l.sort((a, b) => b.mc - a.mc);
-    return l;
+  /** The pets shown for the current tab. */
+  function poolFor(f) {
+    const all = API.pets();
+    if (f === 'new') return all.filter(p => !p.example).sort((x, y) => y.createdAt - x.createdAt);
+    if (f === 'examples') return all.filter(p => p.example).sort((x, y) => y.chg - x.chg);
+    return all.slice().sort((x, y) => (y.mc == null ? -1 : y.mc) - (x.mc == null ? -1 : x.mc));
   }
   function tileHtml(p, i) {
     const nx = nextHtml(p);
     const pal = palFor(p);
     return `<li><button class="tile" ${i === 0 ? 'data-primary' : ''} data-pet="${p.id}" data-sig="${esc(sig(p))}" aria-label="${esc(p.name)}, ticker ${esc(p.ticker)}">
-      <span class="terrarium" ${terr(p.species)}>${spriteFor(p, 8)}<span class="mood-tag">${p.mood}</span>${p.mine ? '<span class="mood-tag mine-tag">yours</span>' : ''}</span>
+      <span class="terrarium" ${terr(p.species)}>${spriteFor(p, 8)}<span class="mood-tag">${p.mood}</span>${p.example ? '<span class="mood-tag mine-tag example-tag">example</span>' : (p.mine ? '<span class="mood-tag mine-tag">yours</span>' : '')}</span>
       <span class="tile-info">
         <span class="tile-name"><b data-f="name">${esc(p.name)}</b><i>$${esc(p.ticker)}</i></span>
-        <span class="tile-stats"><span data-f="mc">${E.fmtUsd(p.mc)}</span><span data-f="chg" class="${p.chg >= 0 ? 'up' : 'down'}">${E.fmtPct(p.chg)}</span><small>1h</small></span>
+        <span class="tile-stats"><span data-f="mc">${stat(p.mc, E.fmtUsd)}</span><span data-f="chg" class="${p.chg == null ? '' : p.chg >= 0 ? 'up' : 'down'}">${stat(p.chg, E.fmtPct)}</span><small>1h</small></span>
         <span class="tile-next" data-f="next">${esc(nx.text)}</span>
         <span class="bar" aria-hidden="true"><i data-f="bar" style="width:${nx.pct}%"></i></span>
       </span></button></li>`;
   }
   function tickerHtml() {
-    const ev = API.events().slice(0, 10);
+    const set = new Set(poolFor(curFilter()));
+    const ev = API.events().filter(e => set.has(e.pet)).slice(0, 10);
     if (!ev.length) return '<span>Waiting for the first rule to fire.</span>';
     const items = ev.map(e => `<span><b>${esc(e.pet.name)}</b> ${esc(e.text.split(' because ')[0])}</span>`).join('');
     return items + `<span aria-hidden="true"></span>` + ev.map(e => `<span aria-hidden="true"><b>${esc(e.pet.name)}</b> ${esc(e.text.split(' because ')[0])}</span>`).join('');
   }
+  const SUBS = {
+    new: n => (n ? `${n} real token${n === 1 ? '' : 's'} launched here. Each one does only what its creator’s rules say.` : 'No tokens have launched here yet.'),
+    examples: n => `${n} example pets that show how rules work. They aren’t real tokens and have no market.`,
+    big: n => `Every pet, biggest market cap first. Pets tagged “example” are samples, not real tokens.`
+  };
   const hatchery = {
     render() {
-      const pets = sortPets(API.pets());
-      const f = hatchState.filter;
+      const f = curFilter(), pets = poolFor(f);
       return `<section>
         <div class="hatch-head">
-          <div><h2>The hatchery</h2><p class="sub">${pets.length} pets, and each one does only what its creator’s rules say. Open one to read its rules and its diary.</p></div>
-          <div class="chips" role="group" aria-label="Sort pets" style="margin:0">
-            <button class="chip" data-filter="hot" aria-pressed="${f === 'hot'}">Hot</button>
+          <div><h2>The hatchery</h2><p class="sub">${SUBS[f](pets.length)}</p></div>
+          <div class="chips" role="group" aria-label="Show" style="margin:0">
             <button class="chip" data-filter="new" aria-pressed="${f === 'new'}">Newborn</button>
+            <button class="chip" data-filter="examples" aria-pressed="${f === 'examples'}">Examples</button>
             <button class="chip" data-filter="big" aria-pressed="${f === 'big'}">Biggest</button>
           </div>
         </div>
-        <div class="ticker" aria-label="Latest rules that fired"><div class="ticker-track" id="ticker">${tickerHtml()}</div></div>
+        ${pets.length ? `<div class="ticker" aria-label="Latest rules that fired"><div class="ticker-track" id="ticker">${tickerHtml()}</div></div>` : ''}
         <ul class="tiles" id="tiles">${pets.map((p, i) => tileHtml(p, i)).join('')}
-          <li><button class="tile new-egg" data-go="rules">${S.sprite('egg', { scale: 6 })}<b>Write the rules for yours</b><span>Pick cartridges, name it, hatch it.</span></button></li>
+          <li><button class="tile new-egg" ${pets.length ? '' : 'data-primary'} data-go="${f === 'new' ? 'launch' : 'rules'}">${S.sprite('egg', { scale: 6 })}<b>${f === 'new' ? 'Launch the first one' : 'Write the rules for yours'}</b><span>Pick cartridges, name it, launch it on pump.fun.</span></button></li>
         </ul>
       </section>`;
     },
@@ -192,8 +200,8 @@
         const el = $(`[data-pet="${p.id}"]`, root); if (!el) return;
         const q = k => $(`[data-f="${k}"]`, el);
         q('name').textContent = p.name;
-        q('mc').textContent = E.fmtUsd(p.mc);
-        const c = q('chg'); c.textContent = E.fmtPct(p.chg); c.className = p.chg >= 0 ? 'up' : 'down';
+        q('mc').textContent = stat(p.mc, E.fmtUsd);
+        const c = q('chg'); c.textContent = stat(p.chg, E.fmtPct); c.className = p.chg == null ? '' : p.chg >= 0 ? 'up' : 'down';
         const nx = nextHtml(p); q('next').textContent = nx.text; q('bar').style.width = nx.pct + '%';
         $('.mood-tag', el).textContent = p.mood;
         if (el.dataset.sig !== sig(p)) { $('.sprite', el).outerHTML = spriteFor(p, 8); el.dataset.sig = sig(p); }
@@ -259,8 +267,9 @@
             <div class="terrarium" ${terr(p.species)}><p class="bubble" id="say">${esc(p.say || '...')}</p>${spriteFor(p, 11, p.name)}</div>
             <h2 class="pet-name"><span data-f="name">${esc(p.name)}</span><small>$${esc(p.ticker)}</small></h2>
             <p class="pet-desc">${esc(p.desc || '')}</p>
-            <div class="ca"><code title="${esc(p.ca)}">${esc(p.ca.slice(0, 6))}…${esc(p.ca.slice(-6))}</code><button class="btn sm alt" data-copy>Copy address</button></div>
-            <div class="pet-actions">${API.canEdit(p) ? '<button class="btn hot" data-edit data-primary>Edit rules</button>' : ''}<button class="btn ${API.canEdit(p) ? 'alt' : 'hot'}" data-buy>Buy $${esc(p.ticker)}</button><button class="btn alt" data-clone>Clone these rules</button></div>
+            ${p.example ? '<p class="example-note">Example pet. It shows how rules work and isn’t a real token.</p>' : ''}
+            <div class="ca"><code title="${esc(p.ca)}">${esc(p.ca.slice(0, 6))}…${esc(p.ca.slice(-6))}</code><button class="btn sm alt" data-copy>Copy address</button>${p.signature ? `<a class="btn sm alt" href="${Pump.links.tx(p.signature)}" target="_blank" rel="noopener">Solscan</a>` : ''}</div>
+            <div class="pet-actions">${API.canEdit(p) ? '<button class="btn hot" data-edit data-primary>Edit rules</button>' : ''}${p.example ? '<button class="btn alt" disabled>Example only</button>' : `<button class="btn ${API.canEdit(p) ? 'alt' : 'hot'}" data-buy>${p.real ? `Trade $${esc(p.ticker)} on pump.fun` : `Buy $${esc(p.ticker)}`}</button>`}<button class="btn alt" data-clone>Clone these rules</button></div>
           </div>
           <div>
             <div class="stat-row">
@@ -270,10 +279,10 @@
               <div class="stat"><span>1h change</span><b data-f="chg"></b></div>
             </div>
             <div class="section rules-sec"><h3>The rules ${esc(p.name)} follows</h3>
-              <p class="creator-note">${API.canEdit(p) ? 'You wrote these. Rewrite them any time and the coin follows the new ones.' : 'Set by its creator. The coin does exactly this and nothing else.'}</p>
+              <p class="creator-note">${API.canEdit(p) ? 'You wrote these. Rewrite them any time and the coin follows the new ones.' : (p.mine && p.real ? 'Only the wallet that launched this token can change these. Connect it to edit.' : 'Set by its creator. The coin does exactly this and nothing else.')}</p>
               <ul class="rule-list" id="rules">${p.rules.map(r => ruleCardHtml(r, p)).join('')}</ul></div>
-            <div class="section"><div class="panel chart"><canvas id="chart" width="200" height="76" role="img" aria-label="Market cap over time with rule triggers marked"></canvas>
-              <p class="chart-cap">Dashed lines mark the market cap triggers in its rules. They turn solid pink once fired.</p></div></div>
+            <div class="section"><div class="panel chart">${p.hist.length > 1 ? `<canvas id="chart" width="200" height="76" role="img" aria-label="Market cap over time with rule triggers marked"></canvas>
+              <p class="chart-cap">Dashed lines mark the market cap triggers in its rules. They turn solid pink once fired.</p>` : '<p class="chart-empty">No market data yet. The chart and stats fill in once the token trades.</p>'}</div></div>
             <div class="section"><h3>Diary</h3><ul class="log" id="log">${logHtml(p)}</ul></div>
           </div>
         </div></section>`;
@@ -288,7 +297,11 @@
           App.toast('Address copied');
         }
         if (e.target.closest('[data-edit]')) App.go('rules', { edit: p.id });
-        if (e.target.closest('[data-buy]')) { window.dispatchEvent(new CustomEvent('rulepets:buy', { detail: p })); App.toast(`Opening $${p.ticker}`); }
+        if (e.target.closest('[data-buy]')) {
+          window.dispatchEvent(new CustomEvent('rulepets:buy', { detail: p }));
+          if (p.real) window.open(Pump.links.coin(p.mint), '_blank', 'noopener');
+          App.toast(`Opening $${p.ticker}`);
+        }
         if (e.target.closest('[data-clone]')) {
           draft.species = p.species; draft.color = p.color; draft.rules = p.rules.map(r => E.rule({ metric: r.metric, op: r.op, value: r.value, action: r.action, param: r.param, repeat: r.repeat }));
           saveDraft(); App.toast(`${p.name}’s cartridges are in your slots`); App.go('rules');
@@ -300,8 +313,8 @@
       const p = API.pet(this.petId); if (!p) return;
       const q = k => $(`[data-f="${k}"]`, root);
       q('name').textContent = p.name;
-      q('mc').textContent = E.fmtUsd(p.mc); q('vol').textContent = E.fmtUsd(p.vol); q('holders').textContent = E.fmtNum(p.holders);
-      const c = q('chg'); c.textContent = E.fmtPct(p.chg); c.className = p.chg >= 0 ? 'up' : 'down';
+      q('mc').textContent = stat(p.mc, E.fmtUsd); q('vol').textContent = stat(p.vol, E.fmtUsd); q('holders').textContent = stat(p.holders, E.fmtNum);
+      const c = q('chg'); c.textContent = stat(p.chg, E.fmtPct); c.className = p.chg == null ? '' : p.chg >= 0 ? 'up' : 'down';
       const sp = $('.pet-hero .sprite', root);
       if (this.sig !== sig(p)) { sp.outerHTML = spriteFor(p, 11, p.name); this.sig = sig(p); } else swapMood(sp, p.mood);
       $('#say', root).textContent = p.say || '...';
@@ -318,7 +331,7 @@
         this.logN = p.log.length + ':' + (p.log[0] && p.log[0].t);
         const lg = $('#log', root); lg.innerHTML = logHtml(p); if (lg.firstElementChild) lg.firstElementChild.classList.add('fresh');
       }
-      drawChart($('#chart', root), p);
+      const cv = $('#chart', root); if (cv) drawChart(cv, p);
     }
   };
 
@@ -549,17 +562,25 @@
   };
 
   /* ================= LAUNCH ================= */
+  const cfgFee = () => (window.RulePetsConfig && window.RulePetsConfig.costBuffer) || 0.03;
+  const shortAddr = a => a.slice(0, 4) + '…' + a.slice(-4);
   function receiptHtml() {
-    const rl = draft.rules;
+    const rl = draft.rules, w = API.wallet();
     return `<h3>Contract receipt</h3>
       ${rl.length ? `<ul style="list-style:none;margin:0;padding:0;display:grid;gap:7px">${rl.map(r => { const d = E.describe(r); return `<li>${esc(d.cond.replace(/^./, c => c.toUpperCase()))}<br><span>→ ${esc(d.then)}${r.repeat ? ', every time' : ''}</span></li>`; }).join('')}</ul>` : '<p>No cartridges yet.</p>'}
-      <dl><dt>Network</dt><dd>Solana</dd><dt>Supply</dt><dd>1,000,000,000</dd><dt>Rules</dt><dd>${rl.length} of ${MAX_SLOTS}</dd><dt>Dev buy</dt><dd>${draft.devBuy} SOL</dd><dt>Rules editable by</dt><dd>You</dd></dl>`;
+      <dl><dt>Launches on</dt><dd>pump.fun (Solana)</dd><dt>Supply</dt><dd>1,000,000,000</dd><dt>Rules</dt><dd>${rl.length} of ${MAX_SLOTS}</dd>
+      <dt>Dev buy</dt><dd>${fmtSol(draft.devBuy)} SOL</dd><dt>Fee buffer</dt><dd>${cfgFee()} SOL</dd>
+      <dt>Wallet</dt><dd>${w ? shortAddr(w) : 'not connected'}</dd></dl>`;
   }
+  const STEPS = [
+    ['balance', 'Checking your balance'], ['upload', 'Uploading image and details'], ['build', 'Building the transaction'],
+    ['sign', 'Waiting for you to approve in Phantom'], ['confirm', 'Confirming on Solana']
+  ];
   const launch = {
     render() {
       return `<section>
         <h2>Hatch your pet</h2>
-        <p class="sub">Name it, pick its body, check the receipt, then hold the button. You can rewrite its rules any time after it hatches.</p>
+        <p class="sub">Name it, pick its body, set your dev buy, then hold the button to launch it on pump.fun. You can rewrite its rules any time after it hatches.</p>
         <div class="launch">
           <form id="lform" novalidate onsubmit="return false">
             <div class="row2">
@@ -572,33 +593,58 @@
             <div class="field"><span class="label" id="l-col">Colour</span>
               <div class="swatches" role="radiogroup" aria-labelledby="l-col"><button type="button" role="radio" aria-checked="${!draft.color}" aria-label="Original colour" data-color="" style="background:${S.SPECIES[draft.species].pal.b}"></button>${COLORS.map(c => `<button type="button" role="radio" aria-checked="${draft.color === c}" aria-label="Colour ${c}" data-color="${c}" style="background:${c}"></button>`).join('')}</div></div>
             <div class="field"><span class="label">Token image</span>
-              <div class="file"><label class="btn sm alt" for="f-img" id="f-img-l" tabindex="0">Choose image</label><input id="f-img" type="file" accept="image/*"><span id="imgnote" class="small">Optional. Skip it and the pet’s pixel face is used.</span></div></div>
-            <div class="field"><span class="label">Dev buy at launch</span><div>${cyc('devBuy', 'dev buy', draft.devBuy + ' SOL', 'dev buy amount')}</div></div>
+              <div class="file"><label class="btn sm alt" for="f-img" id="f-img-l" tabindex="0">Choose image</label><input id="f-img" type="file" accept="image/png,image/jpeg,image/gif,image/webp"><span id="imgnote" class="small">Optional, up to 4 MB. Skip it and the pet’s pixel face is used as the token image.</span></div></div>
+            <div class="field"><label for="f-dev">Dev buy (SOL)</label>
+              <div class="devbuy"><input id="f-dev" type="text" inputmode="decimal" autocomplete="off" value="${esc(String(draft.devBuy == null ? '' : draft.devBuy))}" aria-describedby="dev-help">
+                <span class="dev-quick">${[0.1, 0.5, 1, 2].map(v => `<button type="button" class="chip" data-dev="${v}">${v}</button>`).join('')}<button type="button" class="chip" data-dev="max">Max</button></span></div>
+              <small id="dev-help">The exact amount your wallet spends buying its own token at launch. Wallet balance: <b id="bal">${API.wallet() ? '…' : 'connect Phantom'}</b></small></div>
           </form>
           <aside>
             <div class="preview"><div class="terrarium" id="pTerr" ${terr(draft.species)}>${S.sprite(draft.species, { scale: 9, mood: 'happy', pal: palFor(draftPet()) })}</div>
               <p class="tagname"><span id="pName">${esc(draft.name || 'Your pet')}</span> <small id="pTick">$${esc(draft.ticker || 'TICKER')}</small></p></div>
             <div class="receipt" id="receipt">${receiptHtml()}</div>
             <p class="err" id="lerr" role="alert"></p>
-            <button class="btn big hot hold" id="hold" data-hold type="button"><span>Hold to hatch</span></button>
+            <button class="btn big hot hold" id="hold" data-hold type="button"><span>Hold to launch</span></button>
+            <p class="hold-note small" id="holdnote"></p>
           </aside>
         </div></section>`;
     },
     themeFor() { return draft.species; },
+    unmount() { this.off && this.off(); },
     mount(root) {
       const err = msg => { $('#lerr', root).textContent = msg || ''; };
+      let balance = null;
+      const notes = () => {
+        const n = $('#holdnote', root); if (!n) return;
+        n.textContent = `Holding opens Phantom to approve spending ${fmtSol(draft.devBuy)} SOL plus about ${cfgFee()} SOL in fees. Nothing is sent until you approve there.`;
+      };
+      const refreshBalance = () => {
+        const b = $('#bal', root); if (!b) return;
+        if (!API.wallet()) { balance = null; b.textContent = 'connect Phantom'; return; }
+        b.textContent = '…';
+        API.balance().then(v => { balance = v; if ($('#bal', root)) $('#bal', root).textContent = fmtSol(Math.round(v * 1e4) / 1e4) + ' SOL'; })
+          .catch(() => { balance = null; if ($('#bal', root)) $('#bal', root).textContent = 'couldn’t load'; });
+      };
       const refreshPreview = () => {
         $('#pName', root).textContent = draft.name || 'Your pet'; $('#pTick', root).textContent = '$' + (draft.ticker || 'TICKER');
         const t = $('#pTerr', root), tr = S.SPECIES[draft.species].terrarium;
         t.dataset.pat = tr.pat; t.style.setProperty('--tbg', tr.bg); t.style.setProperty('--tfg', tr.fg);
         $('.sprite', t).outerHTML = S.sprite(draft.species, { scale: 9, mood: 'happy', pal: palFor(draftPet()) });
         const first = $('[data-color=""]', root); if (first) first.style.background = S.SPECIES[draft.species].pal.b;
-        $('#receipt', root).innerHTML = receiptHtml();
+        $('#receipt', root).innerHTML = receiptHtml(); notes();
       };
+      notes(); refreshBalance();
+      this.off = API.on('wallet', () => { refreshBalance(); $('#receipt', root).innerHTML = receiptHtml(); });
+
+      const setDev = v => { draft.devBuy = v; saveDraft(); $('#receipt', root).innerHTML = receiptHtml(); notes(); err(''); };
       root.addEventListener('input', e => {
         if (e.target.id === 'f-name') draft.name = e.target.value;
         if (e.target.id === 'f-tick') { e.target.value = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(); draft.ticker = e.target.value; }
         if (e.target.id === 'f-desc') draft.desc = e.target.value;
+        if (e.target.id === 'f-dev') {
+          e.target.value = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+          const n = e.target.value === '' ? null : parseFloat(e.target.value); return setDev(Number.isFinite(n) ? n : null);
+        }
         saveDraft(); $('#pName', root).textContent = draft.name || 'Your pet'; $('#pTick', root).textContent = '$' + (draft.ticker || 'TICKER'); err('');
       });
       root.addEventListener('click', e => {
@@ -606,65 +652,97 @@
         if (b) { draft.species = b.dataset.body; draft.color = null; saveDraft(); $$('[data-body]', root).forEach(x => x.setAttribute('aria-checked', x === b)); $$('[data-color]', root).forEach(x => x.setAttribute('aria-checked', x.dataset.color === '')); applyTheme(draft.species); App.sfx('tick'); refreshPreview(); }
         const c = e.target.closest('[data-color]');
         if (c) { draft.color = c.dataset.color || null; saveDraft(); $$('[data-color]', root).forEach(x => x.setAttribute('aria-checked', x === c)); App.sfx('tick'); refreshPreview(); }
-        const cb = e.target.closest('.cyc-b[data-step]');
-        if (cb) {
-          const list = [0, 0.5, 1, 2, 5]; const i = list.indexOf(draft.devBuy);
-          draft.devBuy = list[(i + (+cb.dataset.step) + list.length) % list.length];
-          $('.cyc-v', cb.parentNode).textContent = draft.devBuy + ' SOL'; $('#receipt', root).innerHTML = receiptHtml(); saveDraft(); App.sfx('tick');
+        const d = e.target.closest('[data-dev]');
+        if (d) {
+          let v = d.dataset.dev === 'max' ? (balance == null ? null : Math.max(0, Math.floor((balance - cfgFee()) * 1e4) / 1e4)) : +d.dataset.dev;
+          if (v == null) return App.toast('Connect Phantom to use Max');
+          $('#f-dev', root).value = String(v); setDev(v); App.sfx('tick');
         }
       });
       $('#f-img-l', root).addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#f-img', root).click(); } });
       $('#f-img', root).addEventListener('change', e => {
         const f = e.target.files[0]; if (!f) return;
-        const rd = new FileReader();
-        rd.onload = () => { draft.image = rd.result; $('#imgnote', root).innerHTML = `<img class="thumb" alt="Chosen token image" src="${rd.result}"> ${esc(f.name)}`; };
-        rd.readAsDataURL(f);
+        if (!/^image\/(png|jpeg|gif|webp)$/.test(f.type)) { e.target.value = ''; return err('Use a PNG, JPG, GIF or WebP image.'); }
+        if (f.size > 4 * 1024 * 1024) { e.target.value = ''; return err('That image is over 4 MB. Pick a smaller one.'); }
+        draft.imageFile = f; err('');
+        $('#imgnote', root).innerHTML = `<img class="thumb" alt="Chosen token image" src="${URL.createObjectURL(f)}"> ${esc(f.name)}`;
       });
+      if (draft.imageFile) $('#imgnote', root).innerHTML = `<img class="thumb" alt="Chosen token image" src="${URL.createObjectURL(draft.imageFile)}"> ${esc(draft.imageFile.name)}`;
+
       const hold = $('#hold', root);
-      let start = 0, raf = 0;
+      let start = 0, raf = 0, launching = false;
       const cancel = () => { start = 0; cancelAnimationFrame(raf); hold.classList.remove('go'); hold.style.setProperty('--p', 0); };
       const loop = () => {
         const p = Math.min(1, (performance.now() - start) / 1000); hold.style.setProperty('--p', p);
         if (p >= 1) { cancel(); finish(); } else raf = requestAnimationFrame(loop);
       };
-      const begin = () => { if (start) return; start = performance.now(); hold.classList.add('go'); App.sfx('charge'); loop(); };
+      const begin = () => { if (start || launching) return; start = performance.now(); hold.classList.add('go'); App.sfx('charge'); loop(); };
       hold.addEventListener('pointerdown', begin);
       ['pointerup', 'pointerleave', 'pointercancel', 'blur', 'keyup'].forEach(ev => hold.addEventListener(ev, cancel));
       hold.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); begin(); } });
       hold.addEventListener('abutton', e => (e.detail === 'down' ? begin() : cancel()));
       hold.addEventListener('click', () => { /* holding is required */ });
 
-      function finish() {
+      async function finish() {
+        if (launching) return;
         const name = draft.name.trim(), tick = draft.ticker.trim();
         const bad = (msg, sel) => { err(msg); App.shake(); App.sfx('back'); const f = $(sel, root); if (f) f.focus(); };
         if (!name) return bad('Give your pet a name.', '#f-name');
         if (tick.length < 2) return bad('Tickers need 2 to 8 letters or numbers.', '#f-tick');
         if (!draft.rules.length) return bad('Slot in at least one cartridge first.', '#hold');
-        err(''); runHatch();
+        if (!Number.isFinite(draft.devBuy) || draft.devBuy < 0) return bad('Enter your dev buy in SOL. Use 0 for none.', '#f-dev');
+        err('');
+        if (!API.wallet()) {
+          try { await API.connectWallet(); } catch (e) {
+            return bad(e && e.message === 'no-phantom' ? 'Phantom isn’t installed. Get it at phantom.app, then try again.' : 'Connect your Phantom wallet to launch.', '#hold');
+          }
+        }
+        launching = true;
+        try { await runLaunch(); } finally { launching = false; }
       }
-      async function runHatch() {
-        const ov = $('#overlay');
+
+      async function runLaunch() {
+        const ov = $('#overlay'), n = draft.rules.length;
+        const close = () => { ov.hidden = true; ov.innerHTML = ''; };
         ov.hidden = false;
-        ov.innerHTML = `<div class="hatch"><span class="egg">${S.sprite('egg', { scale: 12, crack: 1 })}</span><h2>Writing ${draft.rules.length} rule${draft.rules.length === 1 ? '' : 's'} into the shell…</h2></div>`;
+        ov.innerHTML = `<div class="hatch"><span class="egg">${S.sprite('egg', { scale: 11 })}</span><h2>Launching ${esc(draft.name.trim())}…</h2>
+          <ol class="steps" aria-live="polite">${STEPS.map(([k, t]) => `<li data-step="${k}">${t}</li>`).join('')}</ol>
+          <p class="small">Keep this tab open. Nothing is spent unless you approve in Phantom.</p></div>`;
         App.sfx('charge');
-        const eggEl = $('.egg', ov);
-        const t1 = setTimeout(() => { eggEl.innerHTML = S.sprite('egg', { scale: 12, crack: 2 }); App.sfx('crack'); }, 420);
-        const t2 = setTimeout(() => { eggEl.innerHTML = S.sprite('egg', { scale: 12, crack: 3 }); App.sfx('crack'); }, 840);
-        const [pet] = await Promise.all([API.launch(Object.assign({}, draft, { rules: draft.rules.map(r => Object.assign({}, r)) })), new Promise(r => setTimeout(r, 1300))]);
-        clearTimeout(t1); clearTimeout(t2);
+        const onStep = k => {
+          let seen = false;
+          $$('.steps li', ov).forEach(li => { if (li.dataset.step === k) { seen = true; li.className = 'now'; } else li.className = seen ? '' : 'done'; });
+          if (k === 'sign') $('.egg', ov).innerHTML = S.sprite('egg', { scale: 11, crack: 1 });
+          if (k === 'confirm') $('.egg', ov).innerHTML = S.sprite('egg', { scale: 11, crack: 2 });
+        };
+        let pet;
+        try {
+          pet = await API.launch(Object.assign({}, draft, { rules: draft.rules.map(r => Object.assign({}, r)), onStep }));
+        } catch (e) {
+          App.sfx('back');
+          const sent = ['send-failed', 'tx-failed', 'unconfirmed'].includes(e.kind);
+          ov.innerHTML = `<div class="hatch"><span class="egg">${S.sprite('egg', { scale: 11 })}</span><h2>It didn’t launch</h2>
+            <p class="sub" role="alert">${esc(e.message || 'Something went wrong.')}</p>
+            <p class="small">${sent ? 'Check the transaction before trying again, in case it went through.' : 'Nothing was spent.'}</p>
+            <div class="boot-actions" style="justify-content:center">${e.signature ? `<a class="btn big alt" href="${Pump.links.tx(e.signature)}" target="_blank" rel="noopener">View on Solscan</a>` : ''}<button class="btn big hot" data-close data-primary>Back to the form</button></div></div>`;
+          ov.onclick = ev => { if (ev.target.closest('[data-close]')) close(); };
+          App.focusFirst(ov); return;
+        }
+        $('.egg', ov).innerHTML = S.sprite('egg', { scale: 11, crack: 3 }); App.sfx('crack');
+        await new Promise(r => setTimeout(r, 450));
         App.sfx('hatch'); App.led();
         ov.innerHTML = `<div class="hatch"><div class="confetti">${Array.from({ length: 26 }, () => `<i style="--x:${Math.round(Math.random() * 440 - 220)}px;--y:${Math.round(-Math.random() * 240 - 20)}px;--k:${COLORS[Math.floor(Math.random() * 6)]}"></i>`).join('')}</div>
           ${S.sprite(pet.species, { scale: 10, mood: 'hyped', pal: palFor(pet), label: pet.name })}
-          <h2>${esc(pet.name)} hatched.</h2><p class="sub">$${esc(pet.ticker)} is live and following ${pet.rules.length} rule${pet.rules.length === 1 ? '' : 's'}.</p><code>${esc(pet.ca)}</code>
+          <h2>${esc(pet.name)} is live.</h2><p class="sub">$${esc(pet.ticker)} launched on pump.fun with ${n} rule${n === 1 ? '' : 's'}.</p><code>${esc(pet.mint)}</code>
+          <div class="hatch-links"><a href="${Pump.links.coin(pet.mint)}" target="_blank" rel="noopener">pump.fun</a><a href="${Pump.links.tx(pet.signature)}" target="_blank" rel="noopener">Solscan</a></div>
           <div class="boot-actions" style="justify-content:center"><button class="btn big hot" data-view="${pet.id}" data-primary>Meet ${esc(pet.name)}</button><button class="btn big alt" data-edit-rules="${pet.id}">Edit its rules</button><button class="btn big alt" data-close>Back to the hatchery</button></div></div>`;
-        draft.name = ''; draft.ticker = ''; draft.desc = ''; draft.image = null; saveDraft();
+        draft.name = ''; draft.ticker = ''; draft.desc = ''; draft.imageFile = null; saveDraft();
         App.focusFirst(ov);
-        ov.onclick = e => {
-          const v = e.target.closest('[data-view]'), c = e.target.closest('[data-close]');
-          if (v) { ov.hidden = true; ov.innerHTML = ''; App.go('pet', { id: v.dataset.view }); }
-          const ed = e.target.closest('[data-edit-rules]');
-          if (ed) { ov.hidden = true; ov.innerHTML = ''; App.go('rules', { edit: ed.dataset.editRules }); }
-          if (c) { ov.hidden = true; ov.innerHTML = ''; App.go('hatchery'); }
+        ov.onclick = ev => {
+          const v = ev.target.closest('[data-view]'), c = ev.target.closest('[data-close]'), ed = ev.target.closest('[data-edit-rules]');
+          if (v) { close(); App.go('pet', { id: v.dataset.view }); }
+          if (ed) { close(); App.go('rules', { edit: ed.dataset.editRules }); }
+          if (c) { close(); App.go('hatchery'); }
         };
       }
     }

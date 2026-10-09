@@ -281,5 +281,39 @@
     return '#' + ((1 << 24) | (r << 16) | (gg << 8) | b).toString(16).slice(1);
   }
 
-  g.Sprites = { sprite, icon, shade, SPECIES, KEYS: Object.keys(SPECIES) };
+  /** Standalone square SVG of a critter on its terrarium colour, for use as a token image. */
+  function standaloneSvg(key, opts) {
+    opts = opts || {};
+    const grid = buildGrid(key, opts);
+    const W = Math.max.apply(null, grid.map(r => r.length)), H = grid.length, pad = 2;
+    const N = Math.max(W, H) + pad * 2, ox = Math.floor((N - W) / 2), oy = Math.floor((N - H) / 2);
+    const pal = Object.assign({}, PAL_FALLBACK, SPECIES[key].pal, opts.pal || {});
+    let body = `<rect width="${N}" height="${N}" fill="${SPECIES[key].terrarium.bg}"/>`;
+    grid.forEach((row, y) => {
+      let x = 0;
+      while (x < row.length) {
+        const c = row[x];
+        if (c === '.' || !pal[c]) { x++; continue; }
+        let run = 1; while (row[x + run] === c) run++;
+        body += `<rect x="${x + ox}" y="${y + oy}" width="${run}" height="1" fill="${pal[c]}"/>`;
+        x += run;
+      }
+    });
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${N} ${N}" width="512" height="512" shape-rendering="crispEdges">${body}</svg>`;
+  }
+  /** PNG Blob (512x512) of the pixel face — used when the creator doesn't upload an image. */
+  function png(key, opts) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas'); c.width = c.height = 512;
+        const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(img, 0, 0, 512, 512);
+        c.toBlob(b => (b ? resolve(b) : reject(new Error('Couldn’t render the pixel face'))), 'image/png');
+      };
+      img.onerror = () => reject(new Error('Couldn’t render the pixel face'));
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(standaloneSvg(key, opts));
+    });
+  }
+
+  g.Sprites = { png, standaloneSvg, sprite, icon, shade, SPECIES, KEYS: Object.keys(SPECIES) };
 })(window);

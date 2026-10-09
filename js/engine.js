@@ -82,12 +82,14 @@
 
   const holds = (r, s) => {
     const v = s[r.metric];
+    if (v == null) return false; // no data yet (real tokens before stats arrive)
     return r.op === '>=' ? v >= r.value : v <= r.value;
   };
 
   /** 0..1 — how close a rule is to firing (1 = condition true). */
   function progress(r, s) {
     const v = s[r.metric];
+    if (v == null) return 0;
     if (holds(r, s)) return 1;
     if (r.metric === 'chg') {
       if (r.op === '<=') return v >= 0 ? 0 : Math.max(0, Math.min(1, v / r.value));
@@ -109,15 +111,17 @@
   const emit = (ev, data) => (world.listeners[ev] || []).forEach(fn => fn(data));
 
   function makePet(o) {
+    const real = !!o.real;
     const mc = o.mc || 4000;
     return {
+      real, example: !!o.example,
       id: o.id || nextId('p'),
       name: o.name, ticker: o.ticker, species: o.species, color: o.color || null,
       desc: o.desc || '', mine: !!o.mine, owner: o.owner || null,
       ca: o.ca || caFor(),
-      mc, vol: o.vol || mc * 0.9, holders: o.holders || 12, chg: 0, age: o.age || 0,
-      burned: 0, looks: [], mood: 'happy',
-      hist: [mc],
+      mc: real ? null : mc, vol: real ? null : (o.vol || mc * 0.9), holders: real ? null : (o.holders || 12), chg: real ? null : 0, age: o.age || 0,
+      burned: 0, looks: o.looks || [], mood: 'happy',
+      hist: real ? [] : [mc], mint: o.mint || null, signature: o.signature || null, createdAt: o.createdAt || Date.now(),
       vola: o.vola || 0.05, drift: o.drift || 0.002,
       rules: (o.rules || []).map(rule),
       log: [], flash: 0, bornTick: world.tick, say: null
@@ -125,6 +129,7 @@
   }
 
   function moodOf(p) {
+    if (p.mc == null) return 'happy';
     if (p.chg >= 12) return 'hyped';
     if (p.chg <= -14) return 'scared';
     if (p.vol < Math.max(3000, p.mc * 0.25)) return 'bored';
@@ -177,6 +182,13 @@
     if (p.hist.length > 90) p.hist.shift();
     const ref = p.hist[Math.max(0, p.hist.length - 31)];
     p.chg = Math.round(((p.mc / ref) - 1) * 1000) / 10;
+    evaluate(p, silent, backdateMs);
+    if (!silent && rnd() < 0.05) p.say = voiceFor(p);
+    if (p.flash > 0) p.flash--;
+  }
+
+  /** Run a pet's rules against its current stats. Shared by the example simulation and by real stats pushed in. */
+  function evaluate(p, silent, backdateMs) {
     p.rules.forEach(r => {
       if (!holds(r, p)) return;
       if (r.state === 'fired' && !r.repeat) return;
@@ -185,13 +197,20 @@
       applyRule(p, r, silent, backdateMs);
     });
     p.mood = moodOf(p);
-    if (!silent && rnd() < 0.05) p.say = voiceFor(p);
-    if (p.flash > 0) p.flash--;
+  }
+
+  /** Real tokens: the backend reports stats here. stats = { mc, vol, holders, chg, age } (any subset). Rules are evaluated. */
+  function pushStats(p, stats) {
+    ['mc', 'vol', 'holders', 'chg', 'age'].forEach(k => { if (stats[k] != null) p[k] = stats[k]; });
+    if (stats.mc != null) { p.hist.push(stats.mc); if (p.hist.length > 90) p.hist.shift(); }
+    world.tick++;
+    evaluate(p, false);
+    emit('tick', world);
   }
 
   function tick() {
     world.tick++;
-    world.pets.forEach(p => step(p, false));
+    world.pets.forEach(p => { if (!p.real) step(p, false); });
     emit('tick', world);
   }
 
@@ -238,7 +257,7 @@
   function hydrate() {
     SEED.forEach((s, i) => {
       const t = TEMPLATES.find(x => x.key === s.tpl);
-      const p = makePet({ name: t.name, ticker: t.ticker, species: t.species, desc: t.desc, rules: t.rules, mc: s.mc, vol: s.vol, holders: s.holders, age: s.age || (2 + i * 3), drift: s.drift, vola: s.vola, id: 'seed-' + t.key });
+      const p = makePet({ example: true, name: t.name, ticker: t.ticker, species: t.species, desc: t.desc, rules: t.rules, mc: s.mc, vol: s.vol, holders: s.holders, age: s.age || (2 + i * 3), drift: s.drift, vola: s.vola, id: 'seed-' + t.key });
       p.mc = s.mc * 0.8;
       p.hist = [p.mc];
       world.pets.push(p);
@@ -246,7 +265,7 @@
     const N = 70;
     for (let i = 0; i < N; i++) {
       world.tick++;
-      world.pets.forEach(p => step(p, true, Date.now() - (N - i) * MIN_PER_TICK * 60000));
+      world.pets.forEach(p => { if (!p.real) step(p, true, Date.now() - (N - i) * MIN_PER_TICK * 60000); });
     }
     world.events.sort((a, b) => b.t - a.t);
     world.pets.forEach(p => { p.flash = 0; p.say = voiceFor(p); });
@@ -255,16 +274,20 @@
   let timer = null;
   function start() { if (!timer) timer = setInterval(tick, TICK_MS); }
 
+  /** A token that was really launched. draft needs mint (the on-chain address); signature and devBuy are optional. */
   function spawn(draft) {
     const p = makePet({
+      real: true, id: 'tk-' + draft.mint.slice(0, 8), ca: draft.mint, mint: draft.mint, signature: draft.signature || null,
       name: draft.name, ticker: draft.ticker.toUpperCase(), species: draft.species, color: draft.color, desc: draft.desc,
-      rules: draft.rules, mine: true, owner: draft.owner || null, mc: 3200, holders: 1, age: 0, vola: 0.06, drift: 0.004
+      rules: draft.rules, mine: true, owner: draft.owner || null, looks: draft.looks, createdAt: draft.createdAt
     });
-    p.hist = [p.mc];
     p.say = 'hello world. i have rules.';
-    addLog(p, 'launch', `Hatched with ${p.rules.length} rule${p.rules.length === 1 ? '' : 's'}`);
+    if (!draft.restored) {
+      addLog(p, 'launch', `Launched on pump.fun${draft.devBuy ? ` with a ${draft.devBuy} SOL dev buy` : ''}, following ${p.rules.length} rule${p.rules.length === 1 ? '' : 's'}`);
+      p.log[0].t = p.createdAt;
+    }
     world.pets.unshift(p);
-    emit('spawn', p);
+    if (!draft.restored) emit('spawn', p);
     return p;
   }
 
@@ -282,5 +305,5 @@
 
   hydrate();
 
-  g.Engine = { METRICS, OPS, ACTIONS, LOOKS, LOOK_LABEL, TWEETS, TEMPLATES, world, on, rule, describe, holds, progress, moodOf, voiceFor, fmtUsd, fmtNum, fmtPct, start, tick, spawn, updateRules, emit, pick: a => a[Math.floor(Math.random() * a.length)] };
+  g.Engine = { METRICS, OPS, ACTIONS, LOOKS, LOOK_LABEL, TWEETS, TEMPLATES, world, on, rule, describe, holds, progress, moodOf, voiceFor, fmtUsd, fmtNum, fmtPct, start, tick, spawn, updateRules, pushStats, emit, pick: a => a[Math.floor(Math.random() * a.length)] };
 })(window);

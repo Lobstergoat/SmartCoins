@@ -511,3 +511,22 @@ body.canvas button, body.canvas label[for], body.canvas .cyc-v { cursor: pointer
   .device { padding-inline: 18px; }
   .body { grid-template-columns: 132px minmax(0, 1fr) 132px; gap: 10px; }
 }
+
+/* real launches vs examples, dev buy, launch steps */
+.example-tag { background: var(--ink); color: var(--bg); }
+.example-note { margin-top: 8px; padding: 6px 8px; background: var(--lo); font-weight: 800; font-size: 14px; line-height: 1.3; }
+.chart-empty { padding: 20px 8px; font-weight: 700; }
+.devbuy { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.devbuy input#f-dev { width: 11ch; flex: 0 0 auto; font: 700 18px/1 var(--f-px); }
+.dev-quick { display: flex; flex-wrap: wrap; gap: 4px; }
+.hold-note { margin: 10px 3px 0; font-weight: 700; line-height: 1.35; }
+.steps { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 7px; text-align: left; font: 600 16px/1.2 var(--f-px); }
+.steps li { position: relative; padding-left: 24px; opacity: .5; }
+.steps li::before { content: ""; position: absolute; left: 0; top: 2px; width: 13px; height: 13px; box-shadow: inset 0 0 0 3px var(--ink); }
+.steps li.now, .steps li.done { opacity: 1; }
+.steps li.now::before { background: var(--hot); animation: blink .8s steps(1) infinite; }
+.steps li.done::before { background: var(--ink); }
+.hatch-links { display: flex; gap: 18px; }
+.hatch-links a { font: 700 16px/1 var(--f-px); color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
+a.btn { display: inline-block; text-decoration: none; }
+.tile .mine-tag { right: auto; left: 8px; }

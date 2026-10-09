@@ -63,6 +63,7 @@
   App.led = () => { const l = $('#ledFire'); l.classList.add('on'); clearTimeout(ledT); ledT = setTimeout(() => l.classList.remove('on'), 280); };
 
   /* ---------- status bar ---------- */
+  const realCount = () => API.pets().filter(p => p.real).length;
   const short = a => a.slice(0, 4) + '…' + a.slice(-4);
   const walletHtml = () => {
     const a = API.wallet();
@@ -74,7 +75,7 @@
     const active = cur.name === 'pet' ? 'hatchery' : cur.name;
     bar.innerHTML = S.order.map(k => `<button class="tab" data-go="${k}" ${active === k ? 'aria-current="page"' : ''}>${Sp.icon(S.icons[k], 2)}<span>${S.labels[k]}</span></button>`).join('') +
       walletHtml() +
-      `<span class="live" aria-label="${API.pets().length} pets live"><i></i><span>${API.pets().length} live</span></span>`;
+      `<span class="live" aria-label="${realCount()} tokens launched"><i></i><span>${realCount()} launched</span></span>`;
   }
 
   /* ---------- routing ---------- */
@@ -264,7 +265,7 @@
   API.on('tick', () => { if (cur.mod && cur.mod.tick && overlay.hidden) cur.mod.tick(root); });
   API.on('fire', ({ pet }) => { App.led(); if (cur.name === 'pet' && cur.params.id === pet.id) App.sfx('fire'); });
   API.on('spawn', () => drawBar());
-  API.on('wallet', a => { drawBar(); if (a) App.toast('Phantom connected: ' + short(a)); });
+  API.on('wallet', a => { drawBar(); if (a) App.toast('Phantom connected: ' + short(a)); if (cur.name === 'pet') App.refresh(); }); // edit rights depend on the wallet
 
   let walletBusy = false;
   async function toggleWallet() {
